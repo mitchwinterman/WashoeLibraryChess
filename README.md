@@ -10,13 +10,10 @@ A chess board, computer opponent, and training site for the Booked for Chess mee
 - **Load and save:** Paste a PGN or FEN, or copy or download the game as a PGN.
 - **Puzzles:** About 41,500 Lichess puzzles by theme (fork, pin, mate in 2, back rank mate, and more) and difficulty. Wrong moves can be retried, with Hint, Show Solution, an optional timer, and a first-try score.
 - **Printable worksheets:** 6, 12, or 18 puzzle diagrams by theme and difficulty, with an answer key.
-- **Projector View:** Hides the header and fills the screen height with the board. Press P to turn it on and P or Esc to turn it off.
+- **Woodpecker Trainer:** Drill an opening line (17 starter lines, or search all 3,600 named openings in the Lichess list) or an endgame position (basic checkmates, king and pawn, Lucena, Philidor). Miss a move and the board goes back a step; a run log tracks misses and time for each run.
+- **Projector View:** Goes full screen and sizes the board to the full screen height, with the status, move buttons, section buttons, and panel beside it. Press P to turn it on and P or Esc to turn it off.
 
 Keyboard: Left and Right arrows step through moves, Up and Down jump to the start and end, F flips the board, and P toggles Projector View.
-
-## Coming next
-
-- Woodpecker-style opening and endgame drills
 
 ## Turning on the website
 

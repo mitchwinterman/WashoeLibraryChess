@@ -22,6 +22,7 @@
       <button class="tab" role="tab" data-mode="board" aria-selected="true">Board</button>
       <button class="tab" role="tab" data-mode="play" aria-selected="false">Play the Computer</button>
       <button class="tab" role="tab" data-mode="puzzles" aria-selected="false">Puzzles</button>
+      <button class="tab" role="tab" data-mode="train" aria-selected="false">Woodpecker Trainer</button>
     </nav>
     <button id="btn-projector" class="btn btn-ghost" aria-pressed="false" title="Projector view (P)">Projector View</button>
   </header>
@@ -43,6 +44,13 @@
     </section>
 
     <aside class="panel-col">
+      <nav class="proj-tabs" aria-label="Sections">
+        <button class="tab" data-mode="board">Board</button>
+        <button class="tab" data-mode="play">Play</button>
+        <button class="tab" data-mode="puzzles">Puzzles</button>
+        <button class="tab" data-mode="train">Trainer</button>
+        <button id="btn-projector-exit" class="tab proj-exit" title="Exit Projector View (Esc)">Exit</button>
+      </nav>
       <!-- Board tab -->
       <section id="panel-board" class="card">
         <h2>Board</h2>
@@ -146,6 +154,54 @@
         </details>
       </section>
 
+      <!-- Woodpecker trainer -->
+      <section id="panel-train" class="card" hidden>
+        <h2>Woodpecker Trainer</h2>
+        <div id="tr-pick">
+          <p class="hint-text">Play one side of a line. Miss a move and the board goes back a step so you can try again. Run the same line until it’s automatic.</p>
+          <div class="seg" role="group" aria-label="What to practice">
+            <button class="seg-btn" data-kind="openings" aria-pressed="true">Openings</button>
+            <button class="seg-btn" data-kind="endgames" aria-pressed="false">Endgames</button>
+          </div>
+          <div id="tr-openings">
+            <label class="field">Starter lines <select id="tr-starter"></select></label>
+            <label class="field">Or search all 3,600 named openings
+              <input id="tr-search" type="text" placeholder="Type a name, like Sicilian or London" autocomplete="off">
+            </label>
+            <div id="tr-results" class="results"></div>
+            <div id="tr-chosen" class="chosen" hidden>
+              <strong id="tr-chosen-name"></strong>
+              <span id="tr-chosen-line"></span>
+            </div>
+            <label class="field">You play
+              <select id="tr-side"><option value="w">White</option><option value="b">Black</option></select>
+            </label>
+            <button id="tr-start" class="btn btn-big">Start Drill</button>
+          </div>
+          <div id="tr-endgames" hidden>
+            <label class="field">Position <select id="tr-endgame"></select></label>
+            <p class="hint-text">The computer plays the other side and checks every move. A move that throws away the win (or the draw) gets taken back.</p>
+            <button id="tr-start-endgame" class="btn btn-big">Start Drill</button>
+          </div>
+        </div>
+        <div id="tr-live" hidden>
+          <p id="tr-title" class="tr-title"></p>
+          <p id="tr-progress" class="pz-info"></p>
+          <p id="tr-msg" class="play-msg" aria-live="polite"></p>
+          <div class="btn-grid">
+            <button id="tr-back" class="btn" hidden>Back to Drill</button>
+            <button id="tr-hint" class="btn">Hint</button>
+            <button id="tr-again" class="btn">Run It Again</button>
+            <button id="tr-change" class="btn btn-secondary">Choose Another</button>
+          </div>
+          <details id="tr-line" class="more"><summary>Show the whole line</summary><p id="tr-line-text" class="line-text"></p></details>
+          <div id="tr-log-wrap" hidden>
+            <h3 class="log-head">This session</h3>
+            <ol id="tr-log" class="run-log"></ol>
+          </div>
+        </div>
+      </section>
+
       <!-- Setup -->
       <section id="panel-setup" class="card" hidden>
         <h2>Set Up Position</h2>
@@ -194,7 +250,6 @@
   </dialog>
 
   <div id="toast" class="toast" role="status" hidden></div>
-  <button id="btn-projector-exit" class="btn projector-exit" title="Exit projector view (Esc)">Exit Projector View</button>
   <div id="print-area" class="print-area" aria-hidden="true"></div>
 
   <footer class="site-footer">

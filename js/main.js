@@ -9,6 +9,7 @@ import { GameTree, START_FEN, moveNumberLabel } from './gametree.js'
 import { Engine, uciToMove } from './engine.js'
 import { loadOpenings, openingFor } from './openings.js'
 import { initPuzzles } from './puzzles.js'
+import { initTrain } from './train.js'
 
 import { MK_LAST, MK_CHECK, MK_SELECT, MK_WRONG, MK_GOOD, MK_HINT, AR_HINT } from './marks.js'
 
@@ -19,7 +20,7 @@ const ANNOTATION_CLASSES = new Set(['arrow-success', 'arrow-warning', 'arrow-inf
 const $ = sel => document.querySelector(sel)
 const tree = new GameTree()
 const engine = new Engine()
-let mode = 'board' // 'board' | 'play' | 'puzzles' | 'setup'
+let mode = 'board' // 'board' | 'play' | 'puzzles' | 'train' | 'setup'
 const game = { active: false, over: false, userColor: 'w', level: 3, tip: null, thinking: false, result: '' }
 const setup = { tool: 'wp', selected: null, previousFen: null }
 
@@ -69,6 +70,7 @@ function canUserMove() {
       tree.chessAt().turn() === game.userColor
   }
   if (mode === 'puzzles') return puzzles.canMove()
+  if (mode === 'train') return train.canMove()
   return false
 }
 
@@ -98,10 +100,11 @@ function render(animate = false) {
   renderInfo(chess)
   if (mode === 'play') renderPlayPanel()
   if (mode === 'puzzles') puzzles.renderPanel()
+  if (mode === 'train') train.renderPanel()
 }
 
 function renderInfo(chess) {
-  const op = mode === 'puzzles' ? null : openingFor(tree.pathToCurrent())
+  const op = (mode === 'puzzles' || (mode === 'train' && tree.root.fen !== START_FEN)) ? null : openingFor(tree.pathToCurrent())
   $('#opening').textContent = op ? `${op.eco} ${op.name}` : ''
   const st = statusText(chess)
   const turn = chess.turn() === 'w' ? 'White to move' : 'Black to move'
@@ -139,7 +142,7 @@ function renderMoves() {
   if (!tree.root.children.length) {
     const p = document.createElement('p')
     p.className = 'muted empty'
-    p.textContent = mode === 'puzzles' ? 'The puzzle moves will appear here.' : 'Make a move on the board. Moves will appear here.'
+    p.textContent = mode === 'puzzles' ? 'The puzzle moves will appear here.' : mode === 'train' ? 'The drill moves will appear here.' : 'Make a move on the board. Moves will appear here.'
     box.append(p)
   }
   // keep the selected move visible inside the list without scrolling the whole page
@@ -269,6 +272,7 @@ function userMove(move) {
   render(true)
   if (mode === 'play' && !game.over) computerTurn()
   if (mode === 'puzzles') puzzles.afterUserMove(node)
+  if (mode === 'train') train.afterUserMove(node)
 }
 
 board.enableMoveInput(onInput)
@@ -526,10 +530,11 @@ function setMode(next) {
   if (mode === 'setup' && next !== 'setup') leaveSetup()
   if (mode === 'play' && next !== 'play' && game.active) endGame()
   if (mode === 'puzzles' && next !== 'puzzles') puzzles.leave()
+  if (mode === 'train' && next !== 'train') train.leave()
   mode = next
   document.body.dataset.mode = mode
   for (const t of document.querySelectorAll('.tab')) t.setAttribute('aria-selected', t.dataset.mode === mode || (mode === 'setup' && t.dataset.mode === 'board') ? 'true' : 'false')
-  for (const id of ['board', 'play', 'puzzles', 'setup']) $(`#panel-${id}`).hidden = mode !== id
+  for (const id of ['board', 'play', 'puzzles', 'train', 'setup']) $(`#panel-${id}`).hidden = mode !== id
   $('#moves-card').hidden = mode === 'setup'
   if (mode === 'setup') {
     $('#opening').textContent = ''
@@ -540,10 +545,11 @@ function setMode(next) {
   }
   if (mode === 'play') renderPlayPanel()
   if (mode === 'puzzles') { puzzles.enter(); return }
+  if (mode === 'train') { train.enter(); return }
   render(false)
 }
 
-for (const t of document.querySelectorAll('.tab')) t.addEventListener('click', () => setMode(t.dataset.mode))
+for (const t of document.querySelectorAll('.tab[data-mode]')) t.addEventListener('click', () => setMode(t.dataset.mode))
 
 // ---------- board tab buttons ----------
 $('#btn-start').addEventListener('click', () => navigate(() => tree.toStart()))
@@ -615,10 +621,20 @@ function toast(msg) {
 }
 
 // ---------- projector view and keyboard ----------
-function toggleProjector() {
-  const on = document.body.classList.toggle('projector')
+function setProjector(on) {
+  document.body.classList.toggle('projector', on)
   $('#btn-projector').setAttribute('aria-pressed', on)
+  // full screen hides the browser toolbar and the Windows taskbar, which gives the board much more room
+  try {
+    if (on && !document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {})
+    if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {})
+  } catch {}
 }
+function toggleProjector() { setProjector(!document.body.classList.contains('projector')) }
+// leaving full screen with Esc also leaves Projector View
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement && document.body.classList.contains('projector')) setProjector(false)
+})
 $('#btn-projector').addEventListener('click', toggleProjector)
 $('#btn-projector-exit').addEventListener('click', toggleProjector)
 
@@ -637,6 +653,7 @@ document.addEventListener('keydown', e => {
 
 // ---------- puzzles ----------
 const puzzles = initPuzzles({ board, tree, render, toast, setMode: m => setMode(m), saveAnnotations, getMode: () => mode })
+const train = initTrain({ board, tree, render, toast, engine })
 
 // ---------- start ----------
 buildPalette()

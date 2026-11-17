@@ -3,6 +3,7 @@ import { Chess } from '../vendor/chessjs/chess.js'
 
 let byPosition = null
 let loading = null
+export const openingList = [] // { eco, name, pgn }
 
 const key = fen => fen.split(' ').slice(0, 4).join(' ')
 
@@ -15,6 +16,7 @@ export function loadOpenings() {
           for (const row of text.split('\n').slice(1)) {
             const [eco, name, pgn] = row.split('\t')
             if (!pgn) continue
+            openingList.push({ eco, name, pgn: pgn.trim() })
             const chess = new Chess()
             for (const tok of pgn.split(/\s+/)) {
               if (!tok || /^\d+\./.test(tok)) continue
