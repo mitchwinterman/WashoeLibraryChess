@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Booked for Chess</title>
+  <meta name="description" content="Booked for Chess: a chess board, computer opponent, and training tools from Washoe County Library System.">
+  <link rel="icon" href="img/favicon.png">
+  <link rel="stylesheet" href="vendor/cm-chessboard/assets/chessboard.css">
+  <link rel="stylesheet" href="vendor/cm-chessboard/assets/extensions/markers/markers.css">
+  <link rel="stylesheet" href="vendor/cm-chessboard/assets/extensions/arrows/arrows.css">
+  <link rel="stylesheet" href="vendor/cm-chessboard/assets/extensions/promotion-dialog/promotion-dialog.css">
+  <link rel="stylesheet" href="css/site.css">
+</head>
+<body data-mode="board">
+  <header class="site-header">
+    <div class="brand">
+      <img src="img/wcls-logo-white.png" alt="Washoe County Library System" class="logo">
+      <span class="site-title">Booked for Chess</span>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Sections">
+      <button class="tab" role="tab" data-mode="board" aria-selected="true">Board</button>
+      <button class="tab" role="tab" data-mode="play" aria-selected="false">Play the Computer</button>
+    </nav>
+    <button id="btn-projector" class="btn btn-ghost" aria-pressed="false" title="Projector view (P)">Projector View</button>
+  </header>
+
+  <main class="layout">
+    <section class="board-col" aria-label="Chess board">
+      <div class="board-meta">
+        <span id="status" class="status" aria-live="polite">White to move</span>
+        <span id="opening" class="opening"></span>
+      </div>
+      <div id="board" class="board"></div>
+      <div class="nav-row" role="group" aria-label="Move through the game">
+        <button id="btn-start" class="btn btn-icon" title="First move (Up arrow)" aria-label="First move">|&lt;</button>
+        <button id="btn-back" class="btn btn-icon" title="Back (Left arrow)" aria-label="Back one move">&lt;</button>
+        <button id="btn-fwd" class="btn btn-icon" title="Forward (Right arrow)" aria-label="Forward one move">&gt;</button>
+        <button id="btn-end" class="btn btn-icon" title="Last move (Down arrow)" aria-label="Last move">&gt;|</button>
+        <button id="btn-flip" class="btn btn-secondary" title="Flip board (F)">Flip Board</button>
+      </div>
+    </section>
+
+    <aside class="panel-col">
+      <!-- Board tab -->
+      <section id="panel-board" class="card">
+        <h2>Board</h2>
+        <p class="hint-text">Move pieces for both sides. Right-click and drag to draw arrows; right-click a square to circle it. Hold Shift or Alt for other colors.</p>
+        <div class="btn-grid">
+          <button id="btn-setup" class="btn">Set Up Position</button>
+          <button id="btn-playhere" class="btn">Play From Here</button>
+          <button id="btn-load" class="btn btn-secondary">Load Game or Position</button>
+          <button id="btn-new" class="btn btn-secondary">New Board</button>
+        </div>
+        <details class="more">
+          <summary>More tools</summary>
+          <div class="btn-grid">
+            <button id="btn-promote" class="btn btn-secondary">Make Main Line</button>
+            <button id="btn-delete" class="btn btn-secondary">Delete From Here</button>
+            <button id="btn-clear-arrows" class="btn btn-secondary">Clear Arrows</button>
+            <button id="btn-copy-fen" class="btn btn-secondary">Copy FEN</button>
+            <button id="btn-copy-pgn" class="btn btn-secondary">Copy PGN</button>
+            <button id="btn-download-pgn" class="btn btn-secondary">Download PGN</button>
+          </div>
+        </details>
+      </section>
+
+      <!-- Play tab -->
+      <section id="panel-play" class="card" hidden>
+        <h2>Play the Computer</h2>
+        <div id="play-setup">
+          <label class="field">You play
+            <select id="play-color">
+              <option value="w">White</option>
+              <option value="b">Black</option>
+              <option value="random">Random</option>
+            </select>
+          </label>
+          <label class="field">Computer level: <output id="play-level-out">3</output>
+            <input id="play-level" type="range" min="1" max="8" value="3">
+            <span class="range-labels"><span>1 Beginner</span><span>8 Expert</span></span>
+          </label>
+          <label class="field">Start from
+            <select id="play-from">
+              <option value="new">A new game</option>
+              <option value="here">The position on the board</option>
+            </select>
+          </label>
+          <button id="play-start" class="btn btn-big">Start Game</button>
+        </div>
+        <div id="play-live" hidden>
+          <p id="play-who"></p>
+          <p id="play-msg" class="play-msg" aria-live="polite"></p>
+          <div class="btn-grid">
+            <button id="back-to-game" class="btn" hidden>Back to Game</button>
+            <button id="hint-btn" class="btn">Hint</button>
+            <button id="takeback-btn" class="btn btn-secondary">Take Back</button>
+            <button id="resign-btn" class="btn btn-secondary">Resign</button>
+            <button id="review-btn" class="btn btn-secondary">Review on Board</button>
+            <button id="newgame-btn" class="btn btn-secondary">New Game</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Setup -->
+      <section id="panel-setup" class="card" hidden>
+        <h2>Set Up Position</h2>
+        <p class="hint-text">Pick a piece, then click squares to place it. Click a piece again to remove it.</p>
+        <div id="palette" class="palette"></div>
+        <fieldset class="field">
+          <legend>Whose move?</legend>
+          <label><input type="radio" name="setup-turn" value="w" checked> White</label>
+          <label><input type="radio" name="setup-turn" value="b"> Black</label>
+        </fieldset>
+        <fieldset class="field">
+          <legend>Castling allowed</legend>
+          <label><input type="checkbox" id="castle-wk"> White short</label>
+          <label><input type="checkbox" id="castle-wq"> White long</label>
+          <label><input type="checkbox" id="castle-bk"> Black short</label>
+          <label><input type="checkbox" id="castle-bq"> Black long</label>
+        </fieldset>
+        <div class="btn-grid">
+          <button id="setup-start" class="btn btn-secondary">Starting Position</button>
+          <button id="setup-clear" class="btn btn-secondary">Clear Board</button>
+        </div>
+        <label class="field">Or paste a FEN
+          <span class="inline-row"><input id="setup-fen" type="text" spellcheck="false" autocomplete="off"><button id="setup-fen-load" class="btn btn-secondary">Load</button></span>
+        </label>
+        <div class="btn-grid">
+          <button id="setup-done" class="btn btn-big">Done</button>
+          <button id="setup-cancel" class="btn btn-secondary">Cancel</button>
+        </div>
+      </section>
+
+      <section id="moves-card" class="card moves-card">
+        <h2>Moves</h2>
+        <div id="moves" class="moves" aria-live="polite"></div>
+        <label class="field comment-field">Note on this move
+          <textarea id="comment" rows="2" placeholder="Type a note for this position"></textarea>
+        </label>
+      </section>
+    </aside>
+  </main>
+
+  <dialog id="load-dialog" class="dialog">
+    <form method="dialog">
+      <h2>Load Game or Position</h2>
+      <p class="hint-text">Paste a PGN (a game) or a FEN (a single position).</p>
+      <textarea id="load-text" rows="8" spellcheck="false"></textarea>
+      <p id="load-error" class="error" aria-live="polite"></p>
+      <div class="btn-row">
+        <button id="load-go" class="btn">Load</button>
+        <button id="load-cancel" type="button" class="btn btn-secondary">Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <footer class="site-footer">
+    <p>Washoe County Library System. Chess engine: Stockfish (GPL). Board: cm-chessboard (MIT). Rules: chess.js (BSD). Opening names and puzzles: Lichess (public domain).</p>
+  </footer>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
