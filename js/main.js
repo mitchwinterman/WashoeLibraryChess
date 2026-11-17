@@ -8,12 +8,10 @@ import { Chess, SQUARES } from '../vendor/chessjs/chess.js'
 import { GameTree, START_FEN, moveNumberLabel } from './gametree.js'
 import { Engine, uciToMove } from './engine.js'
 import { loadOpenings, openingFor } from './openings.js'
+import { initPuzzles } from './puzzles.js'
 
-// ---------- marker and arrow styles (colors set in css/site.css) ----------
-const MK_LAST = { class: 'mk-last', slice: 'markerSquare' }
-const MK_CHECK = { class: 'mk-check', slice: 'markerCircleFilled' }
-const MK_SELECT = { class: 'mk-select', slice: 'markerFrame' }
-const AR_HINT = { class: 'ar-hint' }
+import { MK_LAST, MK_CHECK, MK_SELECT, MK_WRONG, MK_GOOD, MK_HINT, AR_HINT } from './marks.js'
+
 const ANNOTATION_CLASSES = new Set(['arrow-success', 'arrow-warning', 'arrow-info', 'arrow-danger',
   'marker-circle-success', 'marker-circle-warning', 'marker-circle-info', 'marker-circle-danger'])
 
@@ -21,9 +19,9 @@ const ANNOTATION_CLASSES = new Set(['arrow-success', 'arrow-warning', 'arrow-inf
 const $ = sel => document.querySelector(sel)
 const tree = new GameTree()
 const engine = new Engine()
-let mode = 'board' // 'board' | 'play' | 'setup'
+let mode = 'board' // 'board' | 'play' | 'puzzles' | 'setup'
 const game = { active: false, over: false, userColor: 'w', level: 3, tip: null, thinking: false, result: '' }
-const setup = { tool: 'wp', selected: null, turn: 'w', previousFen: null }
+const setup = { tool: 'wp', selected: null, previousFen: null }
 
 const board = new Chessboard($('#board'), {
   position: START_FEN,
@@ -52,6 +50,11 @@ function saveAnnotations() {
   node.annotations = (arrows.length || markers.length) ? { arrows, markers } : null
 }
 
+function clearAnnotations() {
+  board.setAnnotations({ arrows: [], markers: [] })
+  tree.current.annotations = null
+}
+
 function navigate(fn) {
   if (mode === 'setup') return
   saveAnnotations()
@@ -65,6 +68,7 @@ function canUserMove() {
     return game.active && !game.over && !game.thinking && tree.current === game.tip &&
       tree.chessAt().turn() === game.userColor
   }
+  if (mode === 'puzzles') return puzzles.canMove()
   return false
 }
 
@@ -81,7 +85,7 @@ function statusText(chess) {
 function render(animate = false) {
   const node = tree.current
   board.setPosition(node.fen, animate)
-  board.removeMarkers(MK_LAST); board.removeMarkers(MK_CHECK); board.removeMarkers(MK_SELECT)
+  for (const t of [MK_LAST, MK_CHECK, MK_SELECT, MK_WRONG, MK_GOOD, MK_HINT]) board.removeMarkers(t)
   board.removeArrows(AR_HINT)
   board.setAnnotations(node.annotations || { arrows: [], markers: [] })
   if (node.from) { board.addMarker(MK_LAST, node.from); board.addMarker(MK_LAST, node.to) }
@@ -93,10 +97,11 @@ function render(animate = false) {
   renderMoves()
   renderInfo(chess)
   if (mode === 'play') renderPlayPanel()
+  if (mode === 'puzzles') puzzles.renderPanel()
 }
 
 function renderInfo(chess) {
-  const op = openingFor(tree.pathToCurrent())
+  const op = mode === 'puzzles' ? null : openingFor(tree.pathToCurrent())
   $('#opening').textContent = op ? `${op.eco} ${op.name}` : ''
   const st = statusText(chess)
   const turn = chess.turn() === 'w' ? 'White to move' : 'Black to move'
@@ -104,33 +109,78 @@ function renderInfo(chess) {
   $('#status').classList.toggle('status-end', !!st)
   const c = $('#comment')
   if (document.activeElement !== c) c.value = tree.current.comment || ''
-  c.disabled = mode !== 'board'
 }
 
+// Move list: numbered rows with White and Black columns. Side lines and notes appear under the row.
 function renderMoves() {
   const box = $('#moves')
   box.innerHTML = ''
-  if (tree.root.comment) box.append(commentEl(tree.root.comment))
-  writeLine(tree.root, true, box, 0)
+  if (tree.root.comment) box.append(noteBlock(tree.root.comment))
+  let row = null
+  let node = tree.root
+  while (node.children.length) {
+    const [main, ...vars] = node.children
+    const whiteMove = main.ply % 2 === 1
+    if (whiteMove || !row || row.full) {
+      row = newRow(main)
+      box.append(row.el)
+      if (!whiteMove) row.white.append(dots())
+    }
+    const cell = whiteMove ? row.white : row.black
+    cell.append(moveEl(main, false, true))
+    if (!whiteMove) row.full = true
+    if (main.comment || vars.length) {
+      if (main.comment) box.append(noteBlock(main.comment))
+      for (const v of vars) box.append(variationBlock(v))
+      row.full = true
+    }
+    node = main
+  }
   if (!tree.root.children.length) {
     const p = document.createElement('p')
-    p.className = 'muted'
-    p.textContent = mode === 'play' ? 'Moves will appear here.' : 'Make a move on the board. Moves will appear here.'
+    p.className = 'muted empty'
+    p.textContent = mode === 'puzzles' ? 'The puzzle moves will appear here.' : 'Make a move on the board. Moves will appear here.'
     box.append(p)
   }
+  // keep the selected move visible inside the list without scrolling the whole page
   const cur = box.querySelector('.move.current')
-  if (cur) cur.scrollIntoView({ block: 'nearest' })
+  if (cur) {
+    const top = cur.offsetTop - box.offsetTop, bottom = top + cur.offsetHeight
+    if (top < box.scrollTop) box.scrollTop = top - 8
+    else if (bottom > box.scrollTop + box.clientHeight) box.scrollTop = bottom - box.clientHeight + 8
+  }
 }
 
-function moveEl(node, force) {
+function newRow(node) {
+  const el = document.createElement('div')
+  el.className = 'mrow'
+  const num = document.createElement('span')
+  num.className = 'mno'
+  num.textContent = Math.floor((node.ply - 1) / 2) + 1
+  const white = document.createElement('span'); white.className = 'mcell'
+  const black = document.createElement('span'); black.className = 'mcell'
+  el.append(num, white, black)
+  return { el, white, black, full: false }
+}
+
+function dots() { const s = document.createElement('span'); s.className = 'dots'; s.textContent = '…'; return s }
+
+function moveEl(node, force, inTable = false) {
   const span = document.createElement('span')
-  span.className = 'move' + (node === tree.current ? ' current' : '')
+  span.className = 'move' + (node === tree.current ? ' current' : '') + (inTable ? ' in-table' : '')
   span.dataset.id = node.id
-  const label = moveNumberLabel(node, force)
+  const label = inTable ? '' : moveNumberLabel(node, force)
   if (label) { const n = document.createElement('span'); n.className = 'num'; n.textContent = label + ' '; span.append(n) }
   span.append(node.san)
   span.tabIndex = 0
   return span
+}
+
+function noteBlock(text) {
+  const d = document.createElement('div')
+  d.className = 'note-block'
+  d.textContent = text
+  return d
 }
 
 function commentEl(text) {
@@ -140,20 +190,29 @@ function commentEl(text) {
   return c
 }
 
-function writeLine(node, force, container, depth) {
+function variationBlock(v) {
+  const d = document.createElement('div')
+  d.className = 'var-block'
+  d.append(moveEl(v, true))
+  if (v.comment) d.append(commentEl(v.comment))
+  writeInline(v, false, d)
+  return d
+}
+
+function writeInline(node, force, container) {
   if (!node.children.length) return
   const [main, ...vars] = node.children
   container.append(moveEl(main, force))
   if (main.comment) container.append(commentEl(main.comment))
   for (const v of vars) {
     const box = document.createElement('span')
-    box.className = 'variation depth-' + Math.min(depth + 1, 3)
+    box.className = 'variation'
     box.append(moveEl(v, true))
     if (v.comment) box.append(commentEl(v.comment))
-    writeLine(v, false, box, depth + 1)
+    writeInline(v, false, box)
     container.append(box)
   }
-  writeLine(main, vars.length > 0 || !!main.comment, container, depth)
+  writeInline(main, vars.length > 0 || !!main.comment, container)
 }
 
 $('#moves').addEventListener('click', e => {
@@ -186,14 +245,18 @@ function onInput(event) {
       const color = chess.turn() === 'w' ? COLOR.white : COLOR.black
       board.showPromotionDialog(event.squareTo, color, result => {
         if (result.type === PROMOTION_DIALOG_RESULT_TYPE.pieceSelected) {
-          userMove({ from: event.squareFrom, to: event.squareTo, promotion: result.piece.charAt(1) })
+          const move = { from: event.squareFrom, to: event.squareTo, promotion: result.piece.charAt(1) }
+          if (mode === 'puzzles' && !puzzles.accept(move)) { render(false); return }
+          userMove(move)
         } else {
           render(false)
         }
       })
       return true
     }
-    event.chessboard.state.moveInputProcess.then(() => userMove({ from: event.squareFrom, to: event.squareTo }))
+    const move = { from: event.squareFrom, to: event.squareTo }
+    if (mode === 'puzzles' && !puzzles.accept(move)) return false
+    event.chessboard.state.moveInputProcess.then(() => userMove(move))
     return true
   }
 }
@@ -205,9 +268,18 @@ function userMove(move) {
   if (mode === 'play') { game.tip = node; checkGameOver() }
   render(true)
   if (mode === 'play' && !game.over) computerTurn()
+  if (mode === 'puzzles') puzzles.afterUserMove(node)
 }
 
 board.enableMoveInput(onInput)
+
+// A plain left-click on the board clears drawn arrows and circles.
+$('#board').addEventListener('pointerdown', e => {
+  if (e.button === 0 && mode !== 'setup' && board.getAnnotations) {
+    const a = board.getAnnotations()
+    if (a.arrows.some(x => ANNOTATION_CLASSES.has(x.type.class)) || a.markers.some(x => ANNOTATION_CLASSES.has(x.type.class))) clearAnnotations()
+  }
+}, true)
 
 // ---------- play the computer ----------
 function checkGameOver() {
@@ -224,7 +296,7 @@ async function computerTurn() {
   renderPlayPanel()
   try {
     const uci = await engine.computerMove(fenAtStart, game.level)
-    if (!game.active || game.tip.fen !== fenAtStart) return // game changed while thinking
+    if (!game.active || game.tip.fen !== fenAtStart) return
     if (!uci) return
     saveAnnotations()
     tree.goTo(game.tip)
@@ -235,7 +307,7 @@ async function computerTurn() {
     toast('The computer could not start. Try reloading the page.')
   } finally {
     game.thinking = false
-    render(true)
+    if (mode === 'play') render(true)
   }
 }
 
@@ -266,8 +338,6 @@ function endGame() {
 function takeBack() {
   if (!game.active || game.thinking) return
   saveAnnotations()
-  tree.goTo(game.tip)
-  // step back to the last position where it was the player's turn, before their last move
   let n = game.tip.parent
   while (n && new Chess(n.fen).turn() !== game.userColor) n = n.parent
   if (!n) { toast('There is no move of yours to take back yet.'); return }
@@ -350,7 +420,7 @@ function markTool() {
 
 function onSetupSquare(e) {
   const sq = e.square
-  if (!sq) return
+  if (!sq || (e.event && e.event.button === 2)) return
   if (setup.tool === 'move') {
     if (!setup.selected) {
       if (board.getPiece(sq)) { setup.selected = sq; board.addMarker(MK_SELECT, sq) }
@@ -368,31 +438,36 @@ function onSetupSquare(e) {
   } else {
     board.setPiece(sq, board.getPiece(sq) === setup.tool ? null : setup.tool)
   }
-  autoCastling()
 }
 
-function autoCastling() {
-  const has = (sq, p) => board.getPiece(sq) === p
-  const rules = { K: ['e1', 'wk', 'h1', 'wr'], Q: ['e1', 'wk', 'a1', 'wr'], k: ['e8', 'bk', 'h8', 'br'], q: ['e8', 'bk', 'a8', 'br'] }
-  for (const [flag, [ks, kp, rs, rp]] of Object.entries(rules)) {
-    const box = $(`#castle-${flag === flag.toUpperCase() ? 'w' : 'b'}${flag.toLowerCase()}`)
-    const possible = has(ks, kp) && has(rs, rp)
-    box.disabled = !possible
-    if (!possible) box.checked = false
+// In setup, right-click removes a piece instead of drawing arrows.
+function setupRightClick(e) {
+  if (e.button !== 2 && e.type !== 'contextmenu') return
+  e.stopPropagation()
+  e.preventDefault()
+  if (e.type === 'mousedown') {
+    const el = e.target.closest('[data-square]')
+    if (el) board.setPiece(el.dataset.square, null)
   }
 }
 
-function setupFen() {
-  let castle = ''
-  if ($('#castle-wk').checked) castle += 'K'
-  if ($('#castle-wq').checked) castle += 'Q'
-  if ($('#castle-bk').checked) castle += 'k'
-  if ($('#castle-bq').checked) castle += 'q'
-  const turn = document.querySelector('input[name="setup-turn"]:checked').value
-  return `${board.getPosition()} ${turn} ${castle || '-'} - 0 1`
+// Castling is allowed whenever the king and rook are still on their starting squares.
+function castlingFromBoard() {
+  const has = (sq, p) => board.getPiece(sq) === p
+  let c = ''
+  if (has('e1', 'wk') && has('h1', 'wr')) c += 'K'
+  if (has('e1', 'wk') && has('a1', 'wr')) c += 'Q'
+  if (has('e8', 'bk') && has('h8', 'br')) c += 'k'
+  if (has('e8', 'bk') && has('a8', 'br')) c += 'q'
+  return c || '-'
 }
 
-function checkPosition(fen) {
+function setupFen() {
+  const turn = document.querySelector('input[name="setup-turn"]:checked').value
+  return `${board.getPosition()} ${turn} ${castlingFromBoard()} - 0 1`
+}
+
+export function checkPosition(fen) {
   const placement = fen.split(' ')[0]
   const count = ch => (placement.match(new RegExp(ch, 'g')) || []).length
   if (count('K') !== 1 || count('k') !== 1) return 'Each side needs exactly one king.'
@@ -400,7 +475,6 @@ function checkPosition(fen) {
   if (/[pP]/.test(ranks[0]) || /[pP]/.test(ranks[7])) return 'Pawns can’t be on the first or last row.'
   const v = new Chess().validate_fen(fen)
   if (!v.valid) return 'That position isn’t valid: ' + v.error
-  // the side that just moved may not be in check
   const flipped = fen.replace(/ ([wb]) /, (_, t) => ` ${t === 'w' ? 'b' : 'w'} `)
   const other = new Chess()
   if (other.load(flipped) && other.in_check()) return 'The side not to move is in check. Change whose move it is.'
@@ -410,19 +484,17 @@ function checkPosition(fen) {
 function enterSetup() {
   saveAnnotations()
   setup.previousFen = tree.current.fen
-  const parts = tree.current.fen.split(' ')
-  document.querySelector(`input[name="setup-turn"][value="${parts[1]}"]`).checked = true
-  $('#castle-wk').checked = parts[2].includes('K'); $('#castle-wq').checked = parts[2].includes('Q')
-  $('#castle-bk').checked = parts[2].includes('k'); $('#castle-bq').checked = parts[2].includes('q')
+  document.querySelector(`input[name="setup-turn"][value="${tree.current.fen.split(' ')[1]}"]`).checked = true
   board.disableMoveInput()
   board.removeMarkers(); board.removeArrows()
   board.enableSquareSelect(POINTER_EVENTS.pointerdown, onSetupSquare)
-  autoCastling()
+  for (const t of ['mousedown', 'mouseup', 'contextmenu']) $('#board').addEventListener(t, setupRightClick, true)
   markTool()
 }
 
 function leaveSetup() {
   board.disableSquareSelect(POINTER_EVENTS.pointerdown)
+  for (const t of ['mousedown', 'mouseup', 'contextmenu']) $('#board').removeEventListener(t, setupRightClick, true)
   board.removeMarkers(MK_SELECT)
   board.enableMoveInput(onInput)
 }
@@ -438,9 +510,8 @@ $('#setup-cancel').addEventListener('click', () => { board.setPosition(setup.pre
 $('#setup-start').addEventListener('click', () => {
   board.setPosition(START_FEN, false)
   document.querySelector('input[name="setup-turn"][value="w"]').checked = true
-  autoCastling(); for (const id of ['wk', 'wq', 'bk', 'bq']) $(`#castle-${id}`).checked = true
 })
-$('#setup-clear').addEventListener('click', () => { board.setPosition('8/8/8/8/8/8/8/8', false); autoCastling() })
+$('#setup-clear').addEventListener('click', () => { board.setPosition('8/8/8/8/8/8/8/8', false) })
 $('#setup-fen-load').addEventListener('click', () => {
   const fen = $('#setup-fen').value.trim()
   const full = fen.split(' ').length >= 4 ? fen : `${fen} w - - 0 1`
@@ -454,15 +525,21 @@ $('#setup-fen-load').addEventListener('click', () => {
 function setMode(next) {
   if (mode === 'setup' && next !== 'setup') leaveSetup()
   if (mode === 'play' && next !== 'play' && game.active) endGame()
+  if (mode === 'puzzles' && next !== 'puzzles') puzzles.leave()
   mode = next
   document.body.dataset.mode = mode
   for (const t of document.querySelectorAll('.tab')) t.setAttribute('aria-selected', t.dataset.mode === mode || (mode === 'setup' && t.dataset.mode === 'board') ? 'true' : 'false')
-  $('#panel-board').hidden = mode !== 'board'
-  $('#panel-play').hidden = mode !== 'play'
-  $('#panel-setup').hidden = mode !== 'setup'
+  for (const id of ['board', 'play', 'puzzles', 'setup']) $(`#panel-${id}`).hidden = mode !== id
   $('#moves-card').hidden = mode === 'setup'
-  if (mode === 'setup') { $('#opening').textContent = ''; $('#status').textContent = 'Setting up a position'; $('#status').classList.remove('status-end'); enterSetup(); return }
+  if (mode === 'setup') {
+    $('#opening').textContent = ''
+    $('#status').textContent = 'Setting up a position'
+    $('#status').classList.remove('status-end')
+    enterSetup()
+    return
+  }
   if (mode === 'play') renderPlayPanel()
+  if (mode === 'puzzles') { puzzles.enter(); return }
   render(false)
 }
 
@@ -476,9 +553,11 @@ $('#btn-end').addEventListener('click', () => navigate(() => tree.toEnd()))
 $('#btn-flip').addEventListener('click', flip)
 $('#btn-setup').addEventListener('click', () => setMode('setup'))
 $('#btn-new').addEventListener('click', () => { if (confirmLoss()) { tree.reset(START_FEN); board.setOrientation(COLOR.white); render(false) } })
-$('#btn-delete').addEventListener('click', () => navigate(() => tree.deleteFromHere()))
-$('#btn-promote').addEventListener('click', () => { tree.promote(); render(false) })
-$('#btn-clear-arrows').addEventListener('click', () => { board.setAnnotations({ arrows: [], markers: [] }); tree.current.annotations = null })
+$('#btn-undo').addEventListener('click', () => {
+  if (!tree.current.parent) { toast('There is no move to undo.'); return }
+  navigate(() => tree.deleteFromHere())
+})
+$('#btn-clear-arrows').addEventListener('click', clearAnnotations)
 $('#btn-playhere').addEventListener('click', () => { $('#play-from').value = 'here'; setMode('play') })
 $('#btn-copy-pgn').addEventListener('click', () => copyText(tree.toPgn(), 'PGN copied.'))
 $('#btn-copy-fen').addEventListener('click', () => copyText(tree.current.fen, 'FEN copied.'))
@@ -490,7 +569,7 @@ $('#btn-download-pgn').addEventListener('click', () => {
   a.click()
   setTimeout(() => URL.revokeObjectURL(a.href), 1000)
 })
-$('#btn-load').addEventListener('click', () => { $('#load-text').value = ''; $('#load-dialog').showModal() })
+$('#btn-load').addEventListener('click', () => { $('#load-text').value = ''; $('#load-error').textContent = ''; $('#load-dialog').showModal() })
 $('#load-go').addEventListener('click', e => {
   e.preventDefault()
   const text = $('#load-text').value.trim()
@@ -535,12 +614,13 @@ function toast(msg) {
   toastTimer = setTimeout(() => { t.hidden = true }, 3500)
 }
 
-// ---------- projector mode and keyboard ----------
+// ---------- projector view and keyboard ----------
 function toggleProjector() {
-  document.body.classList.toggle('projector')
-  $('#btn-projector').setAttribute('aria-pressed', document.body.classList.contains('projector'))
+  const on = document.body.classList.toggle('projector')
+  $('#btn-projector').setAttribute('aria-pressed', on)
 }
 $('#btn-projector').addEventListener('click', toggleProjector)
+$('#btn-projector-exit').addEventListener('click', toggleProjector)
 
 document.addEventListener('keydown', e => {
   if (e.target.matches('input, textarea, select') || e.ctrlKey || e.metaKey || e.altKey) return
@@ -552,11 +632,14 @@ document.addEventListener('keydown', e => {
   else if (k === 'ArrowDown' || k === 'End') { navigate(() => tree.toEnd()); e.preventDefault() }
   else if (k === 'f' || k === 'F') flip()
   else if (k === 'p' || k === 'P') toggleProjector()
+  else if (k === 'Escape' && document.body.classList.contains('projector')) toggleProjector()
 })
+
+// ---------- puzzles ----------
+const puzzles = initPuzzles({ board, tree, render, toast, setMode: m => setMode(m), saveAnnotations, getMode: () => mode })
 
 // ---------- start ----------
 buildPalette()
 setMode('board')
-loadOpenings().then(() => renderInfo(tree.chessAt())).catch(() => {})
-// warm up the engine in the background so the first game starts quickly
+loadOpenings().then(() => { if (mode !== 'setup') renderInfo(tree.chessAt()) }).catch(() => {})
 setTimeout(() => engine.start().catch(() => {}), 1500)

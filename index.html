@@ -21,6 +21,7 @@
     <nav class="tabs" role="tablist" aria-label="Sections">
       <button class="tab" role="tab" data-mode="board" aria-selected="true">Board</button>
       <button class="tab" role="tab" data-mode="play" aria-selected="false">Play the Computer</button>
+      <button class="tab" role="tab" data-mode="puzzles" aria-selected="false">Puzzles</button>
     </nav>
     <button id="btn-projector" class="btn btn-ghost" aria-pressed="false" title="Projector view (P)">Projector View</button>
   </header>
@@ -45,18 +46,17 @@
       <!-- Board tab -->
       <section id="panel-board" class="card">
         <h2>Board</h2>
-        <p class="hint-text">Move pieces for both sides. Right-click and drag to draw arrows; right-click a square to circle it. Hold Shift or Alt for other colors.</p>
+        <p class="hint-text">Move pieces for both sides. Right-click and drag to draw an arrow, or right-click a square to circle it. Hold Shift or Alt for other colors. Left-click the board to clear them.</p>
         <div class="btn-grid">
           <button id="btn-setup" class="btn">Set Up Position</button>
           <button id="btn-playhere" class="btn">Play From Here</button>
-          <button id="btn-load" class="btn btn-secondary">Load Game or Position</button>
+          <button id="btn-undo" class="btn btn-secondary" title="Removes the selected move and any moves after it">Undo Move</button>
           <button id="btn-new" class="btn btn-secondary">New Board</button>
         </div>
         <details class="more">
           <summary>More tools</summary>
           <div class="btn-grid">
-            <button id="btn-promote" class="btn btn-secondary">Make Main Line</button>
-            <button id="btn-delete" class="btn btn-secondary">Delete From Here</button>
+            <button id="btn-load" class="btn btn-secondary">Load Game or Position</button>
             <button id="btn-clear-arrows" class="btn btn-secondary">Clear Arrows</button>
             <button id="btn-copy-fen" class="btn btn-secondary">Copy FEN</button>
             <button id="btn-copy-pgn" class="btn btn-secondary">Copy PGN</button>
@@ -102,23 +102,61 @@
         </div>
       </section>
 
+      <!-- Puzzles tab -->
+      <section id="panel-puzzles" class="card" hidden>
+        <h2>Puzzles</h2>
+        <p id="pz-loading" class="hint-text" hidden>Loading puzzles…</p>
+        <div class="pz-filters">
+          <label class="field">Theme <select id="pz-theme"></select></label>
+          <label class="field">Difficulty <select id="pz-diff"></select></label>
+          <label class="field">Timer
+            <select id="pz-timer-len">
+              <option value="0">No timer</option>
+              <option value="30">30 seconds</option>
+              <option value="60">1 minute</option>
+              <option value="120">2 minutes</option>
+              <option value="300">5 minutes</option>
+            </select>
+          </label>
+        </div>
+        <button id="pz-new" class="btn btn-big">New Puzzle</button>
+        <div id="pz-live" hidden>
+          <p id="pz-timer" class="timer" hidden></p>
+          <p id="pz-msg" class="play-msg" aria-live="polite"></p>
+          <p id="pz-info" class="pz-info"></p>
+          <div class="btn-grid">
+            <button id="pz-back" class="btn" hidden>Back to Puzzle</button>
+            <button id="pz-hint" class="btn">Hint</button>
+            <button id="pz-reveal" class="btn btn-secondary">Show Solution</button>
+            <button id="pz-retry" class="btn btn-secondary">Try Again</button>
+            <button id="pz-next" class="btn">Next Puzzle</button>
+            <button id="pz-analyze" class="btn btn-secondary">Open on Board</button>
+          </div>
+          <p id="pz-score" class="pz-score"></p>
+        </div>
+        <details class="more">
+          <summary>Print a worksheet</summary>
+          <label class="field">Theme <select id="ws-theme"></select></label>
+          <label class="field">Difficulty <select id="ws-diff"></select></label>
+          <label class="field">Number of puzzles
+            <select id="ws-count"><option value="6">6 (one page)</option><option value="12" selected>12 (two pages)</option><option value="18">18 (three pages)</option></select>
+          </label>
+          <p class="hint-text">An answer key prints on the last page.</p>
+          <button id="ws-print" class="btn">Print Worksheet</button>
+        </details>
+      </section>
+
       <!-- Setup -->
       <section id="panel-setup" class="card" hidden>
         <h2>Set Up Position</h2>
-        <p class="hint-text">Pick a piece, then click squares to place it. Click a piece again to remove it.</p>
+        <p class="hint-text">Pick a piece, then click squares to place it. Right-click a piece to remove it.</p>
         <div id="palette" class="palette"></div>
         <fieldset class="field">
           <legend>Whose move?</legend>
           <label><input type="radio" name="setup-turn" value="w" checked> White</label>
           <label><input type="radio" name="setup-turn" value="b"> Black</label>
         </fieldset>
-        <fieldset class="field">
-          <legend>Castling allowed</legend>
-          <label><input type="checkbox" id="castle-wk"> White short</label>
-          <label><input type="checkbox" id="castle-wq"> White long</label>
-          <label><input type="checkbox" id="castle-bk"> Black short</label>
-          <label><input type="checkbox" id="castle-bq"> Black long</label>
-        </fieldset>
+        <p class="hint-text">Castling is allowed when the king and rook are still on their starting squares.</p>
         <div class="btn-grid">
           <button id="setup-start" class="btn btn-secondary">Starting Position</button>
           <button id="setup-clear" class="btn btn-secondary">Clear Board</button>
@@ -156,6 +194,8 @@
   </dialog>
 
   <div id="toast" class="toast" role="status" hidden></div>
+  <button id="btn-projector-exit" class="btn projector-exit" title="Exit projector view (Esc)">Exit Projector View</button>
+  <div id="print-area" class="print-area" aria-hidden="true"></div>
 
   <footer class="site-footer">
     <p>Washoe County Library System. Chess engine: Stockfish (GPL). Board: cm-chessboard (MIT). Rules: chess.js (BSD). Opening names and puzzles: Lichess (public domain).</p>
