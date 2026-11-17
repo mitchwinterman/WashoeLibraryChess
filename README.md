@@ -7,10 +7,14 @@ A chess board, computer opponent, and training site for the Booked for Chess mee
 - **Board:** Move pieces for both sides, with arrows and circles (right-click), a two-column move list with side lines, notes on moves, and opening names.
 - **Set Up Position:** Place pieces, choose whose move it is, set castling rights, or paste a FEN.
 - **Play the Computer:** Play as White, Black, or a random color against Stockfish at levels 1 through 8, from a new game or from the position on the board. Includes Hint, Take Back, and Resign.
+- **Analysis:** Show Analysis adds an evaluation bar beside the board and the computer's best line. Review Game marks inaccuracies (?!), mistakes (?), and blunders (??) in the main line.
+- **Captured pieces:** Shown above and below the board, with the material difference.
 - **Load and save:** Paste a PGN or FEN, or copy or download the game as a PGN.
 - **Puzzles:** About 41,500 Lichess puzzles by theme (fork, pin, mate in 2, back rank mate, and more) and difficulty. Wrong moves can be retried, with Hint, Show Solution, an optional timer, and a first-try score.
 - **Printable worksheets:** 6, 12, or 18 puzzle diagrams by theme and difficulty, with an answer key.
-- **Woodpecker Trainer:** Drill an opening line (17 starter lines, or search all 3,600 named openings in the Lichess list) or an endgame position (basic checkmates, king and pawn, Lucena, Philidor). Miss a move and the board goes back a step; a run log tracks misses and time for each run.
+- **Coordinate trainer:** In the Trainer tab, find or name squares against the clock, from White's or Black's side, with or without board labels.
+- **Pairings:** Swiss, round robin, or casual pairings for meetup nights, with byes for odd numbers, results, standings, and a tiebreak. The event is saved in the browser until you start over.
+- **Woodpecker Trainer:** Drill an opening line (17 starter lines, or search all 3,600 named openings in the Lichess list) or an endgame position (basic checkmates, king and pawn, Lucena, Philidor). Miss a move and the board goes back a step. Hint shows the piece first, then the move. After a run it suggests other variations of the same opening; a run log tracks misses and time for each run.
 - **Projector View:** Goes full screen and sizes the board to the full screen height, with the status, move buttons, section buttons, and panel beside it. Press P to turn it on and P or Esc to turn it off.
 
 Keyboard: Left and Right arrows step through moves, Up and Down jump to the start and end, F flips the board, and P toggles Projector View.

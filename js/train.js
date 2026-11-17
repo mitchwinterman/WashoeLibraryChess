@@ -2,7 +2,7 @@
 // Miss a move and the board goes back a step; play the right move and it keeps going.
 import { COLOR } from '../vendor/cm-chessboard/src/Chessboard.js'
 import { Chess } from '../vendor/chessjs/chess.js'
-import { MK_WRONG, AR_HINT } from './marks.js'
+import { MK_WRONG, MK_GOOD, MK_HINT, AR_HINT } from './marks.js'
 import { loadOpenings, openingList } from './openings.js'
 
 // Starter lines, taken from the Lichess opening list.
@@ -59,7 +59,8 @@ export function initTrain(ctx) {
   const $ = s => document.querySelector(s)
   const tr = {
     kind: 'openings', item: null, moves: [], idx: 0, side: 'w', tip: null,
-    state: 'idle', mistakes: 0, runs: [], startedAt: 0, goal: null, safeMoves: 0, timer: null, chosen: null
+    state: 'idle', mistakes: 0, runs: [], startedAt: 0, goal: null, safeMoves: 0, timer: null, chosen: null,
+    hint: { fen: null, move: null, stage: 0 }
   }
 
   // ---------- menus ----------
@@ -114,6 +115,8 @@ export function initTrain(ctx) {
 
   function beginRun() {
     clearTimeout(tr.timer)
+    $('#tr-vars').hidden = true
+    tr.hint = { fen: null, move: null, stage: 0 }
     tr.idx = 0; tr.mistakes = 0; tr.safeMoves = 0
     tr.startedAt = Date.now()
     tr.state = 'busy'
@@ -273,21 +276,67 @@ export function initTrain(ctx) {
     const n = tr.runs.length
     setMsg(tr.mistakes ? `Run ${n} complete with ${tr.mistakes} ${tr.mistakes === 1 ? 'miss' : 'misses'}. Run it again!` : `Run ${n} complete with no misses!`, 'good')
     showPanel()
+    if (tr.kind === 'openings') showVariations()
   }
 
-  function hint() {
-    if (tr.state !== 'yourturn') return
-    tree.goTo(tr.tip); render(false)
-    if (tr.kind === 'openings') {
-      const m = tr.moves[tr.idx]
-      board.addArrow(AR_HINT, m.uci.slice(0, 2), m.uci.slice(2, 4))
-    } else {
-      setMsg('Looking for a good move…')
-      engine.search(tr.tip.fen, { skill: 20, depth: 14, movetime: 900 }).then(res => {
-        if (res.bestmove && tree.current === tr.tip) board.addArrow(AR_HINT, res.bestmove.slice(0, 2), res.bestmove.slice(2, 4))
-        setMsg(goalText())
-      })
+  // Other lines of the same opening, best matches first: lines that branch off this one, then the rest of the family.
+  async function showVariations() {
+    await loadOpenings().catch(() => {})
+    const family = tr.item.name.split(':')[0].trim()
+    const mine = tr.moves.map(m => m.san)
+    const shared = o => {
+      const sans = o.pgn.split(/\s+/).filter(t => t && !/^\d+\./.test(t))
+      let k = 0
+      while (k < sans.length && k < mine.length && sans[k] === mine[k]) k++
+      return { k, len: sans.length }
     }
+    const seen = new Set([tr.item.pgn])
+    const picks = openingList
+      .filter(o => o.name.split(':')[0].trim() === family && !seen.has(o.pgn) && (seen.add(o.pgn), true))
+      .map(o => ({ o, ...shared(o) }))
+      .filter(x => x.len >= 4 && x.len <= 16 && x.k >= Math.min(2, mine.length))
+      .sort((a, b) => b.k - a.k || a.len - b.len)
+      .slice(0, 8)
+    const box = $('#tr-vars-list')
+    box.innerHTML = ''
+    for (const { o } of picks) {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.className = 'result'
+      b.innerHTML = '<strong></strong><span></span>'
+      b.querySelector('strong').textContent = o.name
+      b.querySelector('span').textContent = o.pgn
+      b.addEventListener('click', () => {
+        tr.chosen = { name: o.name, pgn: o.pgn }
+        tr.item = tr.chosen
+        tr.moves = lineToUci(o.pgn)
+        tr.runs = []
+        beginRun()
+      })
+      box.append(b)
+    }
+    $('#tr-vars').hidden = !picks.length
+  }
+
+  // First hint shows which piece to move; the second shows the move.
+  async function hint() {
+    if (tr.state !== 'yourturn') return
+    if (tree.current !== tr.tip) { tree.goTo(tr.tip); render(false) }
+    const fen = tr.tip.fen
+    if (tr.hint.fen !== fen) {
+      let move = null
+      if (tr.kind === 'openings') move = tr.moves[tr.idx].uci
+      else {
+        $('#tr-hint').disabled = true
+        try { move = (await engine.search(fen, { skill: 20, depth: 14, movetime: 900 })).bestmove } finally { $('#tr-hint').disabled = false }
+      }
+      tr.hint = { fen, move, stage: 0 }
+    }
+    if (!tr.hint.move || tree.current.fen !== fen) return
+    tr.hint.stage++
+    const from = tr.hint.move.slice(0, 2), to = tr.hint.move.slice(2, 4)
+    if (tr.hint.stage === 1) board.addMarker(MK_HINT, from)
+    else { board.removeMarkers(MK_HINT); board.addArrow(AR_HINT, from, to) }
   }
 
   function setMsg(text, kind = '') {
@@ -330,6 +379,8 @@ export function initTrain(ctx) {
     for (const b of document.querySelectorAll('.seg-btn')) b.setAttribute('aria-pressed', b.dataset.kind === kind)
     $('#tr-openings').hidden = kind !== 'openings'
     $('#tr-endgames').hidden = kind !== 'endgames'
+    $('#tr-coords').hidden = kind !== 'coords'
+    $('#tr-intro').hidden = kind === 'coords'
   }
 
   async function enter() {
@@ -342,8 +393,110 @@ export function initTrain(ctx) {
   }
 
   function leave() {
+    if (co.running || !$('#panel-coords').hidden) stopCoords()
     clearTimeout(tr.timer)
     if (tr.state !== 'idle' && tr.state !== 'done') tr.state = 'paused'
+  }
+
+  // ---------- coordinate trainer ----------
+  const FILES = 'abcdefgh', RANKS = '12345678'
+  const co = { running: false, target: null, score: 0, misses: 0, left: 0, timer: null, best: {} }
+  const randSq = () => FILES[Math.floor(Math.random() * 8)] + RANKS[Math.floor(Math.random() * 8)]
+
+  function startCoords() {
+    co.mode = $('#co-mode').value
+    co.sideChoice = $('#co-side').value
+    co.secs = +$('#co-time').value
+    co.score = 0; co.misses = 0; co.left = co.secs
+    co.running = true
+    document.body.classList.toggle('hide-coords', !$('#co-labels').checked)
+    document.body.classList.add('coords-on')
+    ctx.setInput(false)
+    board.removeMarkers(); board.removeArrows()
+    board.setPosition('8/8/8/8/8/8/8/8', false)
+    $('#panel-train').hidden = true
+    $('#panel-coords').hidden = false
+    $('#co-again').hidden = true
+    $('#co-stop').textContent = 'Stop'
+    board.enableSquareSelect('pointerdown', onCoordClick)
+    nextTarget()
+    showTimer()
+    clearInterval(co.timer)
+    co.timer = setInterval(() => { co.left--; showTimer(); if (co.left <= 0) endCoords() }, 1000)
+  }
+
+  function nextTarget() {
+    if (co.sideChoice === 'random') board.setOrientation(Math.random() < 0.5 ? COLOR.white : COLOR.black)
+    else board.setOrientation(co.sideChoice === 'w' ? COLOR.white : COLOR.black)
+    let t
+    do { t = randSq() } while (t === co.target)
+    co.target = t
+    board.removeMarkers(MK_HINT)
+    const choices = $('#co-choices')
+    choices.innerHTML = ''
+    if (co.mode === 'find') {
+      $('#co-prompt').textContent = t
+    } else {
+      $('#co-prompt').textContent = 'Which square is outlined?'
+      board.addMarker(MK_HINT, t)
+      const opts = new Set([t])
+      while (opts.size < 4) opts.add(randSq())
+      for (const o of [...opts].sort(() => Math.random() - 0.5)) {
+        const b = document.createElement('button')
+        b.type = 'button'; b.className = 'btn btn-secondary co-choice'; b.textContent = o
+        b.addEventListener('click', () => answer(o, null))
+        choices.append(b)
+      }
+    }
+    $('#co-score').textContent = `Score: ${co.score}` + (co.misses ? ` · Misses: ${co.misses}` : '')
+  }
+
+  function onCoordClick(e) {
+    if (!co.running || co.mode !== 'find' || !e.square) return
+    answer(e.square, e.square)
+  }
+
+  function answer(guess, square) {
+    if (!co.running) return
+    const right = guess === co.target
+    if (right) co.score++; else co.misses++
+    const mark = square || co.target
+    board.addMarker(right ? MK_GOOD : MK_WRONG, mark)
+    if (!right && square) board.addMarker(MK_GOOD, co.target)
+    setTimeout(() => { board.removeMarkers(MK_GOOD); board.removeMarkers(MK_WRONG) }, right ? 250 : 700)
+    nextTarget()
+  }
+
+  function showTimer() {
+    const t = Math.max(0, co.left)
+    $('#co-timer').textContent = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`
+    $('#co-timer').classList.toggle('timer-low', t <= 5)
+  }
+
+  function endCoords() {
+    clearInterval(co.timer)
+    co.running = false
+    board.removeMarkers()
+    const key = co.mode + co.secs
+    const prev = co.best[key] || 0
+    co.best[key] = Math.max(prev, co.score)
+    $('#co-prompt').textContent = `Time! Score: ${co.score}`
+    $('#co-choices').innerHTML = ''
+    $('#co-score').textContent = (co.score > prev && prev > 0 ? 'New best this session! ' : '') + `Best this session: ${co.best[key]}` + (co.misses ? ` · Misses: ${co.misses}` : '')
+    $('#co-again').hidden = false
+    $('#co-stop').textContent = 'Done'
+  }
+
+  function stopCoords() {
+    clearInterval(co.timer)
+    co.running = false
+    board.disableSquareSelect('pointerdown')
+    board.removeMarkers()
+    document.body.classList.remove('hide-coords', 'coords-on')
+    $('#panel-coords').hidden = true
+    $('#panel-train').hidden = false
+    ctx.setInput(true)
+    render(false)
   }
 
   // ---------- wiring ----------
@@ -353,6 +506,9 @@ export function initTrain(ctx) {
   $('#tr-start').addEventListener('click', startOpening)
   $('#tr-start-endgame').addEventListener('click', startEndgame)
   $('#tr-again').addEventListener('click', () => { if (tr.item) beginRun() })
+  $('#co-start').addEventListener('click', startCoords)
+  $('#co-again').addEventListener('click', startCoords)
+  $('#co-stop').addEventListener('click', () => { if (co.running) endCoords(); else stopCoords() })
   $('#tr-hint').addEventListener('click', hint)
   $('#tr-back').addEventListener('click', () => { tree.goTo(tr.tip); render(true) })
   $('#tr-change').addEventListener('click', () => { clearTimeout(tr.timer); tr.state = 'idle'; tr.runs = []; showPanel() })

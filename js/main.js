@@ -10,6 +10,8 @@ import { Engine, uciToMove } from './engine.js'
 import { loadOpenings, openingFor } from './openings.js'
 import { initPuzzles } from './puzzles.js'
 import { initTrain } from './train.js'
+import { initPairings } from './pairings.js'
+import { capturedFromFen, renderCaptures, whiteScore, scoreText, whitePercent, pvToSan, winChance, terminalScore, judgment } from './analysis.js'
 
 import { MK_LAST, MK_CHECK, MK_SELECT, MK_WRONG, MK_GOOD, MK_HINT, AR_HINT } from './marks.js'
 
@@ -20,7 +22,7 @@ const ANNOTATION_CLASSES = new Set(['arrow-success', 'arrow-warning', 'arrow-inf
 const $ = sel => document.querySelector(sel)
 const tree = new GameTree()
 const engine = new Engine()
-let mode = 'board' // 'board' | 'play' | 'puzzles' | 'train' | 'setup'
+let mode = 'board' // 'board' | 'play' | 'puzzles' | 'train' | 'pairings' | 'setup'
 const game = { active: false, over: false, userColor: 'w', level: 3, tip: null, thinking: false, result: '' }
 const setup = { tool: 'wp', selected: null, previousFen: null }
 
@@ -98,6 +100,8 @@ function render(animate = false) {
   }
   renderMoves()
   renderInfo(chess)
+  renderCapturesBoth()
+  requestAnalysis()
   if (mode === 'play') renderPlayPanel()
   if (mode === 'puzzles') puzzles.renderPanel()
   if (mode === 'train') train.renderPanel()
@@ -175,8 +179,133 @@ function moveEl(node, force, inTable = false) {
   const label = inTable ? '' : moveNumberLabel(node, force)
   if (label) { const n = document.createElement('span'); n.className = 'num'; n.textContent = label + ' '; span.append(n) }
   span.append(node.san)
+  if (node.judgment) {
+    const j = document.createElement('span')
+    j.className = 'judg judg-' + node.judgment.cls
+    j.textContent = node.judgment.sym
+    j.title = node.judgment.word
+    span.append(j)
+  }
   span.tabIndex = 0
   return span
+}
+
+// ---------- captured pieces ----------
+function renderCapturesBoth() {
+  const { taken, material } = capturedFromFen(tree.current.fen)
+  const top = board.getOrientation() === COLOR.white ? 'b' : 'w'
+  const bottom = top === 'w' ? 'b' : 'w'
+  const ahead = c => (c === 'w' ? material : -material)
+  renderCaptures($('#cap-top'), taken[top], ahead(top))
+  renderCaptures($('#cap-bottom'), taken[bottom], ahead(bottom))
+}
+
+// ---------- analysis (Board tab) ----------
+const analysis = { on: false, busy: false, timer: null, reviewing: false }
+
+function requestAnalysis() {
+  const show = analysis.on && mode === 'board'
+  document.body.classList.toggle('analysis-on', show)
+  if (!show) return
+  clearTimeout(analysis.timer)
+  analysis.timer = setTimeout(runAnalysis, 150)
+}
+
+function showEval(ws, fen, pv) {
+  if (tree.current.fen !== fen) return
+  const pct = whitePercent(ws)
+  const fill = $('#eval-fill')
+  // the white part sits at the bottom when White is at the bottom of the board
+  fill.style.height = (board.getOrientation() === COLOR.white ? pct : 100 - pct) + '%'
+  $('#evalbar').classList.toggle('flipped', board.getOrientation() !== COLOR.white)
+  $('#eval-num').textContent = scoreText(ws)
+  $('#an-score').textContent = scoreText(ws) || '…'
+  if (pv) $('#an-line').textContent = pvToSan(fen, pv)
+}
+
+async function runAnalysis() {
+  if (analysis.busy || analysis.reviewing) return
+  const fen = tree.current.fen
+  const term = terminalScore(fen)
+  if (term) {
+    const ws = term.draw ? { cp: 0 } : { mate: 0 }
+    $('#eval-fill').style.height = term.draw ? '50%' : ((term.winner === 'w') === (board.getOrientation() === COLOR.white) ? '100%' : '0%')
+    $('#eval-num').textContent = term.draw ? '½' : (term.winner === 'w' ? '1-0' : '0-1')
+    $('#an-score').textContent = term.draw ? 'Draw' : `${term.winner === 'w' ? 'White' : 'Black'} won`
+    $('#an-line').textContent = ''
+    void ws
+    return
+  }
+  analysis.busy = true
+  $('#an-line').textContent = 'Thinking…'
+  try {
+    const res = await engine.search(fen, {
+      skill: 20, depth: 18, movetime: 2500,
+      onInfo: info => { if (info.score) showEval(whiteScore(info.score, fen), fen, info.pv) }
+    })
+    if (res.score) showEval(whiteScore(res.score, fen), fen)
+  } catch (e) { console.error(e) } finally {
+    analysis.busy = false
+    if (analysis.on && mode === 'board' && tree.current.fen !== fen) runAnalysis()
+  }
+}
+
+function setAnalysis(on) {
+  analysis.on = on
+  $('#btn-analysis').setAttribute('aria-pressed', on)
+  $('#btn-analysis').textContent = on ? 'Hide Analysis' : 'Show Analysis'
+  $('#analysis-box').hidden = !on
+  if (on) engine.start().catch(() => toast('The computer could not start on this computer.'))
+  requestAnalysis()
+}
+
+// Review the main line: find inaccuracies, mistakes, and blunders.
+async function reviewGame() {
+  if (analysis.reviewing) return
+  const line = [tree.root]
+  for (let n = tree.root; n.children.length;) { n = n.children[0]; line.push(n) }
+  if (line.length < 2) { toast('Play or load a game first.'); return }
+  analysis.reviewing = true
+  $('#btn-review').disabled = true
+  const evals = []
+  try {
+    await engine.start()
+    for (let i = 0; i < line.length; i++) {
+      $('#an-review').textContent = `Reviewing position ${i + 1} of ${line.length}…`
+      const fen = line[i].fen
+      const term = terminalScore(fen)
+      if (term) { evals.push(term.draw ? 50 : (term.winner === 'w' ? 100 : 0)); continue }
+      const res = await engine.search(fen, { skill: 20, depth: 13, movetime: 600 })
+      evals.push(winChance(whiteScore(res.score, fen)))
+    }
+    const counts = { w: { blunder: 0, mistake: 0, inaccuracy: 0 }, b: { blunder: 0, mistake: 0, inaccuracy: 0 } }
+    for (let i = 1; i < line.length; i++) {
+      const mover = line[i - 1].fen.split(' ')[1]
+      const drop = mover === 'w' ? evals[i - 1] - evals[i] : evals[i] - evals[i - 1]
+      const j = judgment(drop)
+      line[i].judgment = j
+      if (j) counts[mover][j.word]++
+    }
+    const say = c => `${c.blunder} ${c.blunder === 1 ? 'blunder' : 'blunders'}, ${c.mistake} ${c.mistake === 1 ? 'mistake' : 'mistakes'}, ${c.inaccuracy} ${c.inaccuracy === 1 ? 'inaccuracy' : 'inaccuracies'}`
+    $('#an-review').innerHTML = ''
+    for (const [c, label] of [['w', 'White'], ['b', 'Black']]) {
+      const p = document.createElement('p')
+      p.textContent = `${label}: ${say(counts[c])}`
+      $('#an-review').append(p)
+    }
+    const key = document.createElement('p')
+    key.className = 'an-key'
+    key.innerHTML = '<span class="judg judg-blunder">??</span> blunder <span class="judg judg-mistake">?</span> mistake <span class="judg judg-inaccuracy">?!</span> inaccuracy'
+    $('#an-review').append(key)
+    renderMoves()
+  } catch (e) {
+    console.error(e)
+    $('#an-review').textContent = 'The review could not finish.'
+  } finally {
+    analysis.reviewing = false
+    $('#btn-review').disabled = false
+    requestAnalysis()
+  }
 }
 
 function noteBlock(text) {
@@ -351,16 +480,22 @@ function takeBack() {
   render(false)
 }
 
+// First hint shows which piece to move; the second shows the move.
+const playHint = { fen: null, move: null, stage: 0 }
 async function hint() {
   if (!game.active || game.thinking || game.over) return
-  tree.goTo(game.tip); render(false)
+  if (tree.current !== game.tip) { tree.goTo(game.tip); render(false) }
   $('#hint-btn').disabled = true
   try {
-    const res = await engine.search(game.tip.fen, { skill: 20, depth: 14, movetime: 1200 })
-    if (res.bestmove && tree.current === game.tip) {
-      const m = uciToMove(res.bestmove)
-      board.addArrow(AR_HINT, m.from, m.to)
+    if (playHint.fen !== game.tip.fen) {
+      const res = await engine.search(game.tip.fen, { skill: 20, depth: 14, movetime: 1200 })
+      Object.assign(playHint, { fen: game.tip.fen, move: res.bestmove, stage: 0 })
     }
+    if (!playHint.move || tree.current !== game.tip) return
+    const m = uciToMove(playHint.move)
+    playHint.stage++
+    if (playHint.stage === 1) board.addMarker(MK_HINT, m.from)
+    else { board.removeMarkers(MK_HINT); board.addArrow(AR_HINT, m.from, m.to) }
   } finally { $('#hint-btn').disabled = false }
 }
 
@@ -531,11 +666,14 @@ function setMode(next) {
   if (mode === 'play' && next !== 'play' && game.active) endGame()
   if (mode === 'puzzles' && next !== 'puzzles') puzzles.leave()
   if (mode === 'train' && next !== 'train') train.leave()
+  if (mode === 'pairings' && next !== 'pairings') pairings.leave()
   mode = next
   document.body.dataset.mode = mode
   for (const t of document.querySelectorAll('.tab')) t.setAttribute('aria-selected', t.dataset.mode === mode || (mode === 'setup' && t.dataset.mode === 'board') ? 'true' : 'false')
-  for (const id of ['board', 'play', 'puzzles', 'train', 'setup']) $(`#panel-${id}`).hidden = mode !== id
-  $('#moves-card').hidden = mode === 'setup'
+  for (const id of ['board', 'play', 'puzzles', 'train', 'pairings', 'setup']) $(`#panel-${id}`).hidden = mode !== id
+  $('#moves-card').hidden = mode === 'setup' || mode === 'pairings'
+  requestAnalysis()
+  if (mode === 'pairings') { pairings.enter(); return }
   if (mode === 'setup') {
     $('#opening').textContent = ''
     $('#status').textContent = 'Setting up a position'
@@ -564,6 +702,8 @@ $('#btn-undo').addEventListener('click', () => {
   navigate(() => tree.deleteFromHere())
 })
 $('#btn-clear-arrows').addEventListener('click', clearAnnotations)
+$('#btn-analysis').addEventListener('click', () => setAnalysis(!analysis.on))
+$('#btn-review').addEventListener('click', reviewGame)
 $('#btn-playhere').addEventListener('click', () => { $('#play-from').value = 'here'; setMode('play') })
 $('#btn-copy-pgn').addEventListener('click', () => copyText(tree.toPgn(), 'PGN copied.'))
 $('#btn-copy-fen').addEventListener('click', () => copyText(tree.current.fen, 'FEN copied.'))
@@ -605,6 +745,8 @@ function confirmLoss() {
 
 function flip() {
   board.setOrientation(board.getOrientation() === COLOR.white ? COLOR.black : COLOR.white, true)
+  renderCapturesBoth()
+  requestAnalysis()
 }
 
 async function copyText(text, msg) {
@@ -653,7 +795,9 @@ document.addEventListener('keydown', e => {
 
 // ---------- puzzles ----------
 const puzzles = initPuzzles({ board, tree, render, toast, setMode: m => setMode(m), saveAnnotations, getMode: () => mode })
-const train = initTrain({ board, tree, render, toast, engine })
+const train = initTrain({ board, tree, render, toast, engine,
+  setInput: on => { if (on) board.enableMoveInput(onInput); else board.disableMoveInput() } })
+const pairings = initPairings({ toast })
 
 // ---------- start ----------
 buildPalette()

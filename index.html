@@ -22,7 +22,8 @@
       <button class="tab" role="tab" data-mode="board" aria-selected="true">Board</button>
       <button class="tab" role="tab" data-mode="play" aria-selected="false">Play the Computer</button>
       <button class="tab" role="tab" data-mode="puzzles" aria-selected="false">Puzzles</button>
-      <button class="tab" role="tab" data-mode="train" aria-selected="false">Woodpecker Trainer</button>
+      <button class="tab" role="tab" data-mode="train" aria-selected="false">Trainer</button>
+      <button class="tab" role="tab" data-mode="pairings" aria-selected="false">Pairings</button>
     </nav>
     <button id="btn-projector" class="btn btn-ghost" aria-pressed="false" title="Projector view (P)">Projector View</button>
   </header>
@@ -33,7 +34,12 @@
         <span id="status" class="status" aria-live="polite">White to move</span>
         <span id="opening" class="opening"></span>
       </div>
-      <div id="board" class="board"></div>
+      <div id="cap-top" class="captures"></div>
+      <div class="board-row">
+        <div id="evalbar" class="evalbar" aria-hidden="true"><div id="eval-fill" class="eval-fill"></div><span id="eval-num" class="eval-num"></span></div>
+        <div id="board" class="board"></div>
+      </div>
+      <div id="cap-bottom" class="captures"></div>
       <div class="nav-row" role="group" aria-label="Move through the game">
         <button id="btn-start" class="btn btn-icon" title="First move (Up arrow)" aria-label="First move">|&lt;</button>
         <button id="btn-back" class="btn btn-icon" title="Back (Left arrow)" aria-label="Back one move">&lt;</button>
@@ -49,6 +55,7 @@
         <button class="tab" data-mode="play">Play</button>
         <button class="tab" data-mode="puzzles">Puzzles</button>
         <button class="tab" data-mode="train">Trainer</button>
+        <button class="tab" data-mode="pairings">Pairings</button>
         <button id="btn-projector-exit" class="tab proj-exit" title="Exit Projector View (Esc)">Exit</button>
       </nav>
       <!-- Board tab -->
@@ -61,6 +68,16 @@
           <button id="btn-undo" class="btn btn-secondary" title="Removes the selected move and any moves after it">Undo Move</button>
           <button id="btn-new" class="btn btn-secondary">New Board</button>
         </div>
+        <div class="analysis-row">
+          <button id="btn-analysis" class="btn btn-secondary" aria-pressed="false">Show Analysis</button>
+          <button id="btn-review" class="btn btn-secondary">Review Game</button>
+        </div>
+        <div id="analysis-box" class="analysis-box" hidden>
+          <p class="an-head"><span>Evaluation</span> <strong id="an-score">…</strong></p>
+          <p class="an-label">Best line</p>
+          <p id="an-line" class="an-line"></p>
+        </div>
+        <div id="an-review" class="an-review"></div>
         <details class="more">
           <summary>More tools</summary>
           <div class="btn-grid">
@@ -156,12 +173,13 @@
 
       <!-- Woodpecker trainer -->
       <section id="panel-train" class="card" hidden>
-        <h2>Woodpecker Trainer</h2>
+        <h2>Trainer</h2>
         <div id="tr-pick">
-          <p class="hint-text">Play one side of a line. Miss a move and the board goes back a step so you can try again. Run the same line until it’s automatic.</p>
-          <div class="seg" role="group" aria-label="What to practice">
+          <p class="hint-text" id="tr-intro">Woodpecker method: play one side of a line. Miss a move and the board goes back a step so you can try again. Run the same line until it’s automatic.</p>
+          <div class="seg seg-3" role="group" aria-label="What to practice">
             <button class="seg-btn" data-kind="openings" aria-pressed="true">Openings</button>
             <button class="seg-btn" data-kind="endgames" aria-pressed="false">Endgames</button>
+            <button class="seg-btn" data-kind="coords" aria-pressed="false">Coordinates</button>
           </div>
           <div id="tr-openings">
             <label class="field">Starter lines <select id="tr-starter"></select></label>
@@ -183,6 +201,19 @@
             <p class="hint-text">The computer plays the other side and checks every move. A move that throws away the win (or the draw) gets taken back.</p>
             <button id="tr-start-endgame" class="btn btn-big">Start Drill</button>
           </div>
+          <div id="tr-coords" hidden>
+            <label class="field">Drill
+              <select id="co-mode"><option value="find">Find the square (click it)</option><option value="name">Name the square (pick the name)</option></select>
+            </label>
+            <label class="field">View the board as
+              <select id="co-side"><option value="w">White</option><option value="b">Black</option><option value="random">Random each round</option></select>
+            </label>
+            <label class="field">Time
+              <select id="co-time"><option value="30">30 seconds</option><option value="60">1 minute</option><option value="120">2 minutes</option></select>
+            </label>
+            <label class="check"><input type="checkbox" id="co-labels"> Show letters and numbers on the board</label>
+            <button id="co-start" class="btn btn-big">Start</button>
+          </div>
         </div>
         <div id="tr-live" hidden>
           <p id="tr-title" class="tr-title"></p>
@@ -195,11 +226,34 @@
             <button id="tr-change" class="btn btn-secondary">Choose Another</button>
           </div>
           <details id="tr-line" class="more"><summary>Show the whole line</summary><p id="tr-line-text" class="line-text"></p></details>
+          <div id="tr-vars" class="tr-vars" hidden>
+            <h3 class="log-head">Try another variation</h3>
+            <div id="tr-vars-list" class="results"></div>
+          </div>
           <div id="tr-log-wrap" hidden>
             <h3 class="log-head">This session</h3>
             <ol id="tr-log" class="run-log"></ol>
           </div>
         </div>
+      </section>
+
+      <!-- Coordinate trainer (live) -->
+      <section id="panel-coords" class="card" hidden>
+        <h2>Coordinates</h2>
+        <p id="co-timer" class="timer">0:30</p>
+        <p id="co-prompt" class="co-prompt"></p>
+        <div id="co-choices" class="co-choices"></div>
+        <p id="co-score" class="co-score"></p>
+        <div class="btn-grid">
+          <button id="co-again" class="btn" hidden>Go Again</button>
+          <button id="co-stop" class="btn btn-secondary">Stop</button>
+        </div>
+      </section>
+
+      <!-- Pairings -->
+      <section id="panel-pairings" class="card pairings" hidden>
+        <h2>Pairings</h2>
+        <div id="pr-app"></div>
       </section>
 
       <!-- Setup -->
