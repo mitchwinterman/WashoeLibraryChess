@@ -63,7 +63,14 @@
       <!-- Board tab -->
       <section id="panel-board" class="card">
         <h2>Board</h2>
-        <p class="hint-text">Move pieces for both sides. Right-click and drag to draw an arrow, or right-click a square to circle it. Hold Shift or Alt for other colors. Left-click the board to clear them.</p>
+        <p class="hint-text">Move pieces for both sides. Right-click and drag to draw an arrow, or right-click a square to circle it. Left-click the board to clear them.</p>
+        <div class="draw-colors" role="group" aria-label="Drawing color">
+          <span class="draw-label">Drawing color</span>
+          <button class="draw-color" data-color="success" aria-pressed="true" title="Green"><span style="background:#007947"></span>Green</button>
+          <button class="draw-color" data-color="danger" aria-pressed="false" title="Red"><span style="background:#C1121F"></span>Red</button>
+          <button class="draw-color" data-color="info" aria-pressed="false" title="Purple"><span style="background:#3F2D74"></span>Purple</button>
+          <button class="draw-color" data-color="warning" aria-pressed="false" title="Yellow"><span style="background:#E5A100"></span>Yellow</button>
+        </div>
         <div class="btn-grid">
           <button id="btn-setup" class="btn">Set Up Position</button>
           <button id="btn-playhere" class="btn">Play From Here</button>
