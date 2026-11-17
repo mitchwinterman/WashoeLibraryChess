@@ -47,21 +47,6 @@ const board = new Chessboard($('#board'), {
   ]
 })
 
-// ---------- drawing color for right-click arrows and circles ----------
-// Shift+right-click opens the browser's own menu in some browsers, so the color can also be picked with buttons.
-const annotator = board.getExtension(RightClickAnnotator)
-let drawColor = 'success'
-if (annotator) {
-  const byKeys = annotator.modifiersToColorKey.bind(annotator)
-  annotator.modifiersToColorKey = mods => (mods.shift || mods.alt) ? byKeys(mods) : drawColor
-}
-for (const b of document.querySelectorAll('.draw-color')) {
-  b.addEventListener('click', () => {
-    drawColor = b.dataset.color
-    for (const x of document.querySelectorAll('.draw-color')) x.setAttribute('aria-pressed', x === b)
-  })
-}
-
 // ---------- helpers ----------
 function saveAnnotations() {
   const node = tree.current

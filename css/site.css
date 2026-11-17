@@ -378,12 +378,7 @@ body.learn-on .board-meta, body.learn-on .captures, body.learn-on .nav-row { vis
 body.projector .learn-text { font-size: 1.1em; }
 body.projector.learn-on .board-meta, body.projector.learn-on .nav-row { display: none; }
 
-/* ---------- drawing color picker ---------- */
-.draw-colors { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 12px; }
-.draw-label { font-weight: 700; font-size: .9rem; margin-right: 4px; }
-.draw-color { font: inherit; font-size: .85rem; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 2px solid var(--line); border-radius: 999px; background: #fff; color: var(--ink); cursor: pointer; }
-.draw-color span { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
-.draw-color[aria-pressed="true"] { border-color: var(--purple); background: #EFECF6; }
+/* ---------- annotation colors ---------- */
 .cm-chessboard .arrow-danger .arrow-head { fill: #C1121F; }
 .cm-chessboard .arrow-danger .arrow-line { stroke: #C1121F; opacity: .75; }
 .cm-chessboard .arrow-warning .arrow-head { fill: #E5A100; }
