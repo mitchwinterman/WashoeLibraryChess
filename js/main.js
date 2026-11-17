@@ -205,7 +205,7 @@ const analysis = { on: true, busy: false, timer: null, reviewing: false }
 
 // The evaluation bar shows who is ahead, never which move is best.
 function analysisAllowed() {
-  return analysis.on && mode !== 'setup' && mode !== 'pairings' && !document.body.classList.contains('coords-on')
+  return analysis.on && !['setup', 'pairings', 'puzzles'].includes(mode) && !document.body.classList.contains('coords-on')
 }
 
 function requestAnalysis() {
@@ -689,6 +689,8 @@ function setMode(next) {
 }
 
 for (const t of document.querySelectorAll('.tab[data-mode]')) t.addEventListener('click', () => setMode(t.dataset.mode))
+// the logo and title go back to the home screen (the Board tab)
+$('#home-link').addEventListener('click', () => { setMode('board'); window.scrollTo(0, 0) })
 
 // ---------- board tab buttons ----------
 $('#btn-start').addEventListener('click', () => navigate(() => tree.toStart()))
