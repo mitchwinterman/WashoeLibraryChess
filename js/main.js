@@ -102,6 +102,7 @@ function render(animate = false) {
   renderMoves()
   renderInfo(chess)
   renderCapturesBoth()
+  clearStaleReview()
   requestAnalysis()
   if (mode === 'play') renderPlayPanel()
   if (mode === 'puzzles') puzzles.renderPanel()
@@ -202,7 +203,14 @@ function renderCapturesBoth() {
 }
 
 // ---------- analysis (Board tab) ----------
-const analysis = { on: true, busy: false, timer: null, reviewing: false }
+const analysis = { on: true, busy: false, timer: null, reviewing: false, reviewedKey: null }
+
+// The review summary belongs to one game; clear it when the board holds a different game or the main line changes.
+function mainlineKey() { return tree.root.id + ':' + tree.mainlineEnd().id }
+function clearStaleReview() {
+  if (analysis.reviewing || analysis.reviewedKey === null) return
+  if (analysis.reviewedKey !== mainlineKey()) { analysis.reviewedKey = null; $('#an-review').innerHTML = '' }
+}
 
 // The evaluation bar shows who is ahead, never which move is best.
 function analysisAllowed() {
@@ -299,6 +307,7 @@ async function reviewGame() {
     key.className = 'an-key'
     key.innerHTML = '<span class="judg judg-blunder">??</span> blunder <span class="judg judg-mistake">?</span> mistake <span class="judg judg-inaccuracy">?!</span> inaccuracy'
     $('#an-review').append(key)
+    analysis.reviewedKey = mainlineKey()
     renderMoves()
   } catch (e) {
     console.error(e)
