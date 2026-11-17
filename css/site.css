@@ -356,3 +356,4 @@ body.no-board.projector .panel-col { max-height: none; }
 body.no-board.projector .pr-manage, body.no-board.projector .pr-reset { display: none; }
 body.coords-on #moves-card, body.coords-on .board-meta, body.coords-on .nav-row, body.coords-on .captures { visibility: hidden; }
 body.coords-on #moves-card { display: none; }
+.offline-tag { font-size: .55em; font-weight: 700; background: #fff; color: var(--purple); border-radius: 999px; padding: 2px 10px; vertical-align: middle; margin-left: 6px; }

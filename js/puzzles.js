@@ -2,6 +2,7 @@
 import { Chessboard, COLOR, BORDER_TYPE } from '../vendor/cm-chessboard/src/Chessboard.js'
 import { Chess } from '../vendor/chessjs/chess.js'
 import { MK_WRONG, MK_HINT, AR_HINT } from './marks.js'
+import { OFFLINE, loadScript } from './offline.js'
 
 export const DIFFICULTIES = [
   { id: 'any', label: 'Any difficulty', min: 0, max: 9999 },
@@ -44,7 +45,10 @@ export const themeName = t => THEME_NAMES[t] || t
 let all = null
 let loading = null
 function loadPuzzles() {
-  if (!loading) loading = fetch('data/puzzles.json').then(r => { if (!r.ok) throw new Error('load'); return r.json() }).then(d => (all = d))
+  if (!loading) {
+    loading = (OFFLINE ? loadScript('data/puzzles.js').then(() => window.BFC_PUZZLES)
+      : fetch('data/puzzles.json').then(r => { if (!r.ok) throw new Error('load'); return r.json() })).then(d => (all = d))
+  }
   return loading
 }
 

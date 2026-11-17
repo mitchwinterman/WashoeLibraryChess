@@ -1,5 +1,6 @@
 // Opening names from the Lichess chess-openings list (CC0).
 import { Chess } from '../vendor/chessjs/chess.js'
+import { OFFLINE, loadScript } from './offline.js'
 
 let byPosition = null
 let loading = null
@@ -9,7 +10,10 @@ const key = fen => fen.split(' ').slice(0, 4).join(' ')
 
 export function loadOpenings() {
   if (!loading) {
-    loading = Promise.all('abcde'.split('').map(l => fetch(`data/${l}.tsv`).then(r => r.text())))
+    const texts = OFFLINE
+      ? loadScript('data/openings.js').then(() => window.BFC_OPENINGS)
+      : Promise.all('abcde'.split('').map(l => fetch(`data/${l}.tsv`).then(r => r.text())))
+    loading = texts
       .then(files => {
         byPosition = new Map()
         for (const text of files) {

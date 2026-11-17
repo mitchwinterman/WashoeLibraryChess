@@ -9,6 +9,7 @@ import { GameTree, START_FEN, moveNumberLabel } from './gametree.js'
 import { Engine, uciToMove } from './engine.js'
 import { loadOpenings, openingFor } from './openings.js'
 import { initPuzzles } from './puzzles.js'
+import { PIECE_SPRITE } from './offline.js'
 import { initTrain } from './train.js'
 import { initPairings } from './pairings.js'
 import { capturedFromFen, renderCaptures, whiteScore, scoreText, whitePercent, pvToSan, winChance, terminalScore, judgment } from './analysis.js'
@@ -536,7 +537,7 @@ const PIECE_NAMES = { k: 'king', q: 'queen', r: 'rook', b: 'bishop', n: 'knight'
 
 function buildPalette() {
   const pal = $('#palette')
-  const sprite = 'vendor/cm-chessboard/assets/pieces/standard.svg'
+  const sprite = PIECE_SPRITE
   const pieceTool = p => ({ id: p, label: `${p[0] === 'w' ? 'White' : 'Black'} ${PIECE_NAMES[p[1]]}` })
   const tools = [{ id: 'move', label: 'Move a piece' }, ...PALETTE.slice(0, 6).map(pieceTool),
     { id: 'erase', label: 'Remove a piece' }, ...PALETTE.slice(6).map(pieceTool)]

@@ -23,6 +23,14 @@ Keyboard: Left and Right arrows step through moves, Up and Down jump to the star
 
 Go to **Settings > Pages**. Under **Build and deployment**, choose **Deploy from a branch**, then choose branch `main` and folder `/ (root)`, and click **Save**. The site appears at `https://mitchwinterman.github.io/WashoeLibraryChess/` within a few minutes.
 
+## Offline copy
+
+For when the internet is down, `tools/build-offline.mjs` builds a copy that runs by double-clicking a file, with no internet and no web server:
+
+    node tools/build-offline.mjs "<output folder>"
+
+It writes a `Booked for Chess Offline` folder and an `Open Booked for Chess (Offline).html` launcher. Rebuild it after changing the site, since the offline copy doesn't update itself. The offline copy uses the slower asm.js build of Stockfish, because browsers don't allow WebAssembly files to load from a folder.
+
 ## Credits and licenses
 
 | Part | Source | License |

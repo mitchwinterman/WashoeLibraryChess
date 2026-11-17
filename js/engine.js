@@ -1,5 +1,6 @@
 // Stockfish 10 (Stockfish.js by nmrugg, GPL-3.0) running in a Web Worker.
 import { Chess } from '../vendor/chessjs/chess.js'
+import { OFFLINE, loadScript } from './offline.js'
 
 const WASM_URL = 'vendor/stockfish/stockfish.js'
 const ASM_URL = 'vendor/stockfish/stockfish.asm.js'
@@ -29,7 +30,13 @@ export class Engine {
   }
 
   start() {
-    if (!this.ready) this.ready = this._boot(WASM_URL).catch(() => this._boot(ASM_URL))
+    if (!this.ready) {
+      // Offline, workers can't be loaded from a file, so the engine's code is loaded as a script and started from memory.
+      this.ready = OFFLINE
+        ? loadScript('vendor/stockfish/stockfish-asm-inline.js').then(() =>
+            this._boot(URL.createObjectURL(new Blob([window.BFC_STOCKFISH], { type: 'text/javascript' }))))
+        : this._boot(WASM_URL).catch(() => this._boot(ASM_URL))
+    }
     return this.ready
   }
 

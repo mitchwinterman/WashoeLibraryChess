@@ -1,7 +1,8 @@
 // Analysis bar, best line, captured pieces, and game review.
 import { Chess } from '../vendor/chessjs/chess.js'
+import { PIECE_SPRITE } from './offline.js'
 
-const SPRITE = 'vendor/cm-chessboard/assets/pieces/standard.svg'
+const SPRITE = PIECE_SPRITE
 const START_COUNT = { p: 8, n: 2, b: 2, r: 2, q: 1 }
 const VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9 }
 
