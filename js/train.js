@@ -411,6 +411,7 @@ export function initTrain(ctx) {
     co.running = true
     document.body.classList.toggle('hide-coords', !$('#co-labels').checked)
     document.body.classList.add('coords-on')
+    document.body.classList.remove('analysis-on')
     ctx.setInput(false)
     board.removeMarkers(); board.removeArrows()
     board.setPosition('8/8/8/8/8/8/8/8', false)

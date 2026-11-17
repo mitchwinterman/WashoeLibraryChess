@@ -201,10 +201,15 @@ function renderCapturesBoth() {
 }
 
 // ---------- analysis (Board tab) ----------
-const analysis = { on: false, busy: false, timer: null, reviewing: false }
+const analysis = { on: true, busy: false, timer: null, reviewing: false }
+
+// The evaluation bar shows who is ahead, never which move is best.
+function analysisAllowed() {
+  return analysis.on && mode !== 'setup' && mode !== 'pairings' && !document.body.classList.contains('coords-on')
+}
 
 function requestAnalysis() {
-  const show = analysis.on && mode === 'board'
+  const show = analysisAllowed()
   document.body.classList.toggle('analysis-on', show)
   if (!show) return
   clearTimeout(analysis.timer)
@@ -219,8 +224,6 @@ function showEval(ws, fen, pv) {
   fill.style.height = (board.getOrientation() === COLOR.white ? pct : 100 - pct) + '%'
   $('#evalbar').classList.toggle('flipped', board.getOrientation() !== COLOR.white)
   $('#eval-num').textContent = scoreText(ws)
-  $('#an-score').textContent = scoreText(ws) || '…'
-  if (pv) $('#an-line').textContent = pvToSan(fen, pv)
 }
 
 async function runAnalysis() {
@@ -231,30 +234,28 @@ async function runAnalysis() {
     const ws = term.draw ? { cp: 0 } : { mate: 0 }
     $('#eval-fill').style.height = term.draw ? '50%' : ((term.winner === 'w') === (board.getOrientation() === COLOR.white) ? '100%' : '0%')
     $('#eval-num').textContent = term.draw ? '½' : (term.winner === 'w' ? '1-0' : '0-1')
-    $('#an-score').textContent = term.draw ? 'Draw' : `${term.winner === 'w' ? 'White' : 'Black'} won`
-    $('#an-line').textContent = ''
     void ws
     return
   }
+  // let the computer opponent, puzzle checks and drills go first
+  if (engine.pending > 0) { clearTimeout(analysis.timer); analysis.timer = setTimeout(runAnalysis, 400); return }
   analysis.busy = true
-  $('#an-line').textContent = 'Thinking…'
   try {
     const res = await engine.search(fen, {
-      skill: 20, depth: 18, movetime: 2500,
+      skill: 20, depth: 16, movetime: 1500, background: true,
       onInfo: info => { if (info.score) showEval(whiteScore(info.score, fen), fen, info.pv) }
     })
     if (res.score) showEval(whiteScore(res.score, fen), fen)
   } catch (e) { console.error(e) } finally {
     analysis.busy = false
-    if (analysis.on && mode === 'board' && tree.current.fen !== fen) runAnalysis()
+    if (analysisAllowed() && tree.current.fen !== fen) requestAnalysis()
   }
 }
 
 function setAnalysis(on) {
   analysis.on = on
   $('#btn-analysis').setAttribute('aria-pressed', on)
-  $('#btn-analysis').textContent = on ? 'Hide Analysis' : 'Show Analysis'
-  $('#analysis-box').hidden = !on
+  $('#btn-analysis').textContent = on ? 'Hide Evaluation Bar' : 'Show Evaluation Bar'
   if (on) engine.start().catch(() => toast('The computer could not start on this computer.'))
   requestAnalysis()
 }

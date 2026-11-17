@@ -24,6 +24,8 @@ export class Engine {
     this.listeners = new Set()
     this.ready = null
     this.busy = Promise.resolve()
+    this.pending = 0             // searches waiting or running
+    this.backgroundRunning = false
   }
 
   start() {
@@ -60,9 +62,13 @@ export class Engine {
   }
 
   // Search the position. Returns { bestmove, score } where score is from the side to move.
-  search(fen, { skill = 20, depth = 12, movetime = 1000, onInfo } = {}) {
+  // background: true marks a low-priority search (the analysis bar) that any other search interrupts.
+  search(fen, { skill = 20, depth = 12, movetime = 1000, onInfo, background = false } = {}) {
+    if (!background && this.backgroundRunning) this.send('stop')
+    this.pending++
     return this._queue(async () => {
       await this.start()
+      this.backgroundRunning = background
       return new Promise(resolve => {
         let score = null
         const onLine = line => {
@@ -76,6 +82,8 @@ export class Engine {
           }
           if (line.startsWith('bestmove')) {
             this.listeners.delete(onLine)
+            this.backgroundRunning = false
+            this.pending--
             const best = line.split(' ')[1]
             resolve({ bestmove: best && best !== '(none)' ? best : null, score })
           }

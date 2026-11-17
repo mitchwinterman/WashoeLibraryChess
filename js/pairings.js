@@ -179,7 +179,10 @@ export function initPairings({ toast }) {
         <div class="inline-row"><input id="pr-late" type="text" placeholder="Add a late arrival" autocomplete="off"><button id="pr-late-add" class="btn btn-secondary">Add</button></div>`}
         <ul class="pr-here">${ev.players.map(p => `<li><label class="check"><input type="checkbox" data-here="${p.id}" ${p.here ? 'checked' : ''}${ev.format === 'rr' ? ' disabled' : ''}> ${esc(p.name)} is here</label></li>`).join('')}</ul>
       </details>
-      <button id="pr-reset" class="btn btn-secondary pr-reset">End Event and Start Over</button>`
+      <div class="btn-row pr-reset">
+        <button id="pr-reset" class="btn btn-secondary">End Event, Keep Players</button>
+        <button id="pr-clear-all" class="btn btn-secondary">End Event and Remove All Players</button>
+      </div>`
     el.querySelectorAll('.pr-rbtn').forEach(b => b.addEventListener('click', () => {
       const g = cur.games[+b.dataset.g]
       g.result = g.result === b.dataset.r ? null : b.dataset.r
@@ -195,6 +198,10 @@ export function initPairings({ toast }) {
     el.querySelectorAll('[data-here]').forEach(c => c.addEventListener('change', () => {
       const p = ev.players.find(x => x.id === +c.dataset.here); p.here = c.checked; save(ev); draw()
     }))
+    $('#pr-clear-all').addEventListener('click', () => {
+      if (!window.confirm('End this event and remove every player? Pairings, results and the player list will be cleared.')) return
+      ev = blankEvent(); save(ev); draw()
+    })
     $('#pr-reset').addEventListener('click', () => {
       if (!window.confirm('End this event? Pairings and results will be cleared. The player list stays.')) return
       const keep = ev.players.map(p => ({ ...p, here: true }))
@@ -208,7 +215,7 @@ export function initPairings({ toast }) {
       <p class="hint-text">Add tonight’s players, choose a format, and start. Results and standings are kept in this browser until you start over.</p>
       <div class="inline-row"><input id="pr-name" type="text" placeholder="Player name" autocomplete="off"><button id="pr-add" class="btn">Add</button></div>
       <ul class="pr-list">${ev.players.map(p => `<li><label class="check"><input type="checkbox" data-here="${p.id}" ${p.here ? 'checked' : ''}> ${esc(p.name)}</label><button class="pr-x" data-del="${p.id}" aria-label="Remove ${esc(p.name)}">Remove</button></li>`).join('')}</ul>
-      <p class="pr-count">${ev.players.filter(p => p.here).length} players here</p>
+      <p class="pr-count">${ev.players.filter(p => p.here).length} players here${ev.players.length ? ' · <button id="pr-clear" class="pr-x">Remove all players</button>' : ''}</p>
       <label class="field">Format
         <select id="pr-format">
           <option value="swiss">Swiss: players with similar scores meet</option>
@@ -231,6 +238,10 @@ export function initPairings({ toast }) {
     el.querySelectorAll('[data-here]').forEach(c => c.addEventListener('change', () => {
       ev.players.find(x => x.id === +c.dataset.here).here = c.checked; save(ev); draw()
     }))
+    $('#pr-clear')?.addEventListener('click', () => {
+      if (!window.confirm('Remove every player from the list?')) return
+      ev = blankEvent(); save(ev); draw()
+    })
     $('#pr-start').addEventListener('click', startEvent)
     $('#pr-name').focus()
   }

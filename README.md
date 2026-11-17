@@ -7,7 +7,7 @@ A chess board, computer opponent, and training site for the Booked for Chess mee
 - **Board:** Move pieces for both sides, with arrows and circles (right-click), a two-column move list with side lines, notes on moves, and opening names.
 - **Set Up Position:** Place pieces, choose whose move it is, set castling rights, or paste a FEN.
 - **Play the Computer:** Play as White, Black, or a random color against Stockfish at levels 1 through 8, from a new game or from the position on the board. Includes Hint, Take Back, and Resign.
-- **Analysis:** Show Analysis adds an evaluation bar beside the board and the computer's best line. Review Game marks inaccuracies (?!), mistakes (?), and blunders (??) in the main line.
+- **Evaluation bar:** On by default beside the board in every mode except Set Up Position, Coordinates, and Pairings. It shows who is ahead but never the best move. Review Game marks inaccuracies (?!), mistakes (?), and blunders (??) in the main line.
 - **Captured pieces:** Shown above and below the board, with the material difference.
 - **Load and save:** Paste a PGN or FEN, or copy or download the game as a PGN.
 - **Puzzles:** About 41,500 Lichess puzzles by theme (fork, pin, mate in 2, back rank mate, and more) and difficulty. Wrong moves can be retried, with Hint, Show Solution, an optional timer, and a first-try score.

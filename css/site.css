@@ -59,7 +59,7 @@ html, body { margin: 0; background: var(--page); }
   margin: 0 auto;
   align-items: start;
 }
-.board-col { display: flex; flex-direction: column; align-items: center; --bsize: max(280px, min(100%, calc(100vh - var(--header-h) - 200px))); }
+.board-col { display: flex; flex-direction: column; align-items: center; --bsize: max(280px, min(calc(100vw - var(--panel-w) - 130px), calc(100vh - var(--header-h) - 200px))); }
 #board { width: var(--bsize); }
 .board-row { display: flex; gap: 8px; align-items: stretch; }
 .board-meta, .captures { width: var(--bsize); }
