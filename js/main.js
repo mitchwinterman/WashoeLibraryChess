@@ -12,6 +12,7 @@ import { initPuzzles } from './puzzles.js'
 import { PIECE_SPRITE } from './offline.js'
 import { initTrain } from './train.js'
 import { initPairings } from './pairings.js'
+import { initLearn } from './learn.js'
 import { capturedFromFen, renderCaptures, whiteScore, scoreText, whitePercent, pvToSan, winChance, terminalScore, judgment } from './analysis.js'
 
 import { MK_LAST, MK_CHECK, MK_SELECT, MK_WRONG, MK_GOOD, MK_HINT, AR_HINT } from './marks.js'
@@ -23,7 +24,7 @@ const ANNOTATION_CLASSES = new Set(['arrow-success', 'arrow-warning', 'arrow-inf
 const $ = sel => document.querySelector(sel)
 const tree = new GameTree()
 const engine = new Engine()
-let mode = 'board' // 'board' | 'play' | 'puzzles' | 'train' | 'pairings' | 'setup'
+let mode = 'board' // 'board' | 'learn' | 'play' | 'puzzles' | 'train' | 'pairings' | 'setup'
 const game = { active: false, over: false, userColor: 'w', level: 3, tip: null, thinking: false, result: '' }
 const setup = { tool: 'wp', selected: null, previousFen: null }
 
@@ -214,7 +215,7 @@ function clearStaleReview() {
 
 // The evaluation bar shows who is ahead, never which move is best.
 function analysisAllowed() {
-  return analysis.on && !['setup', 'pairings', 'puzzles'].includes(mode) && !document.body.classList.contains('coords-on')
+  return analysis.on && !['setup', 'pairings', 'puzzles', 'learn'].includes(mode) && !document.body.classList.contains('coords-on')
 }
 
 function requestAnalysis() {
@@ -678,13 +679,15 @@ function setMode(next) {
   if (mode === 'puzzles' && next !== 'puzzles') puzzles.leave()
   if (mode === 'train' && next !== 'train') train.leave()
   if (mode === 'pairings' && next !== 'pairings') pairings.leave()
+  if (mode === 'learn' && next !== 'learn') learn.leave()
   mode = next
   document.body.dataset.mode = mode
   for (const t of document.querySelectorAll('.tab')) t.setAttribute('aria-selected', t.dataset.mode === mode || (mode === 'setup' && t.dataset.mode === 'board') ? 'true' : 'false')
-  for (const id of ['board', 'play', 'puzzles', 'train', 'pairings', 'setup']) $(`#panel-${id}`).hidden = mode !== id
-  $('#moves-card').hidden = mode === 'setup' || mode === 'pairings'
+  for (const id of ['board', 'learn', 'play', 'puzzles', 'train', 'pairings', 'setup']) $(`#panel-${id}`).hidden = mode !== id
+  $('#moves-card').hidden = mode === 'setup' || mode === 'pairings' || mode === 'learn'
   requestAnalysis()
   if (mode === 'pairings') { pairings.enter(); return }
+  if (mode === 'learn') { learn.enter(); return }
   if (mode === 'setup') {
     $('#opening').textContent = ''
     $('#status').textContent = 'Setting up a position'
@@ -811,6 +814,8 @@ const puzzles = initPuzzles({ board, tree, render, toast, setMode: m => setMode(
 const train = initTrain({ board, tree, render, toast, engine,
   setInput: on => { if (on) board.enableMoveInput(onInput); else board.disableMoveInput() } })
 const pairings = initPairings({ toast })
+const learn = initLearn({ board, toast,
+  setInputHandler: fn => { board.disableMoveInput(); board.enableMoveInput(fn || onInput) } })
 
 // ---------- start ----------
 buildPalette()

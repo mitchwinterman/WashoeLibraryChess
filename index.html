@@ -20,6 +20,7 @@
     </button>
     <nav class="tabs" role="tablist" aria-label="Sections">
       <button class="tab" role="tab" data-mode="board" aria-selected="true">Board</button>
+      <button class="tab" role="tab" data-mode="learn" aria-selected="false">Learn to Play</button>
       <button class="tab" role="tab" data-mode="play" aria-selected="false">Play the Computer</button>
       <button class="tab" role="tab" data-mode="puzzles" aria-selected="false">Puzzles</button>
       <button class="tab" role="tab" data-mode="train" aria-selected="false">Trainer</button>
@@ -52,6 +53,7 @@
     <aside class="panel-col">
       <nav class="proj-tabs" aria-label="Sections">
         <button class="tab" data-mode="board">Board</button>
+        <button class="tab" data-mode="learn">Learn</button>
         <button class="tab" data-mode="play">Play</button>
         <button class="tab" data-mode="puzzles">Puzzles</button>
         <button class="tab" data-mode="train">Trainer</button>
@@ -228,6 +230,29 @@
           <div id="tr-log-wrap" hidden>
             <h3 class="log-head">This session</h3>
             <ol id="tr-log" class="run-log"></ol>
+          </div>
+        </div>
+      </section>
+
+      <!-- Learn to Play -->
+      <section id="panel-learn" class="card" hidden>
+        <div id="learn-pick">
+          <h2>Learn to Play</h2>
+          <p class="hint-text">New to chess? Start with The Chessboard and work down the list. Each lesson lets you move the pieces yourself.</p>
+          <div id="learn-list"></div>
+        </div>
+        <div id="learn-live" hidden>
+          <p class="learn-crumb"><button id="learn-list-btn" class="linkish">All lessons</button></p>
+          <h2 id="learn-title"></h2>
+          <p id="learn-progress" class="pz-info"></p>
+          <p id="learn-text" class="learn-text"></p>
+          <div id="learn-values" class="learn-values" hidden></div>
+          <p id="learn-msg" class="play-msg" aria-live="polite"></p>
+          <div class="btn-grid">
+            <button id="learn-hint" class="btn btn-secondary">Hint</button>
+            <button id="learn-reset" class="btn btn-secondary">Start Over</button>
+            <button id="learn-back" class="btn btn-secondary">Back</button>
+            <button id="learn-next" class="btn">Next</button>
           </div>
         </div>
       </section>
